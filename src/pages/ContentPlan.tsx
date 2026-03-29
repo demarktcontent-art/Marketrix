@@ -11,15 +11,19 @@ import { toast } from 'sonner';
 import { SocialPost } from '../types';
 
 export default function ContentPlan() {
-  const { contentItems, products, socialPosts, addSocialPosts, updateSocialPost, toggleSocialPostDone, deleteSocialPost, archiveAndClearSocialPosts, bulkToggleSocialPostDone, bulkDeleteSocialPost } = useStore();
+  const { contentItems, products, socialPosts, addSocialPosts, updateSocialPost, toggleSocialPostDone, deleteSocialPost, archiveAndClearSocialPosts, bulkToggleSocialPostDone, bulkDeleteSocialPost, userProfile } = useStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState<'monthly' | 'ideas'>('monthly');
   const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [postsToDelete, setPostsToDelete] = useState<string[]>([]);
   const [archiveMonthName, setArchiveMonthName] = useState('');
   const [selectedPosts, setSelectedPosts] = useState<Set<string>>(new Set());
   
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingPost, setEditingPost] = useState<SocialPost | null>(null);
+
+  const canManageContent = userProfile?.role === 'Admin' || userProfile?.role === 'Content Manager';
 
   const getProductName = (id: string) => {
     return products.find(p => p.id === id)?.name || 'Unknown Product';
@@ -27,14 +31,14 @@ export default function ContentPlan() {
 
   const statuses = ['Idea', 'In Progress', 'Review', 'Published'];
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const isCSV = file.name.toLowerCase().endsWith('.csv');
     const reader = new FileReader();
     
-    reader.onload = (evt) => {
+    reader.onload = async (evt) => {
       try {
         let wb;
         if (isCSV) {
@@ -73,7 +77,7 @@ export default function ContentPlan() {
         }).filter(post => post.date || post.themeProduct || post.copyCaption);
 
         if (newPosts.length > 0) {
-          addSocialPosts(newPosts);
+          await addSocialPosts(newPosts);
           toast.success(`Imported ${newPosts.length} posts successfully!`);
         } else {
           toast.error("No valid data found. Please check your column headers.");
@@ -97,16 +101,20 @@ export default function ContentPlan() {
     toast.success("Caption copied to clipboard!");
   };
 
-  const handleArchive = (e: React.FormEvent) => {
+  const handleArchive = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!archiveMonthName.trim()) {
       toast.error("Please enter a month name.");
       return;
     }
-    archiveAndClearSocialPosts(archiveMonthName);
-    setIsArchiveModalOpen(false);
-    setArchiveMonthName('');
-    toast.success("Plan archived successfully! You can view it on the Dashboard.");
+    try {
+      await archiveAndClearSocialPosts(archiveMonthName);
+      setIsArchiveModalOpen(false);
+      setArchiveMonthName('');
+      toast.success("Plan archived successfully! You can view it on the Dashboard.");
+    } catch (error) {
+      // Error handled by handleFirestoreError
+    }
   };
 
   // Sort posts by date
@@ -134,17 +142,37 @@ export default function ContentPlan() {
     }
   };
 
-  const handleBulkMarkDone = (isDone: boolean) => {
-    bulkToggleSocialPostDone(Array.from(selectedPosts), isDone);
-    setSelectedPosts(new Set());
-    toast.success(`Marked ${selectedPosts.size} posts as ${isDone ? 'done' : 'undone'}`);
+  const handleBulkMarkDone = async (isDone: boolean) => {
+    try {
+      await bulkToggleSocialPostDone(Array.from(selectedPosts), isDone);
+      setSelectedPosts(new Set());
+      toast.success(`Marked ${selectedPosts.size} posts as ${isDone ? 'done' : 'undone'}`);
+    } catch (error) {
+      // Error handled by handleFirestoreError
+    }
   };
 
-  const handleBulkDelete = () => {
-    if (window.confirm(`Are you sure you want to delete ${selectedPosts.size} posts?`)) {
-      bulkDeleteSocialPost(Array.from(selectedPosts));
-      setSelectedPosts(new Set());
-      toast.success(`Deleted ${selectedPosts.size} posts`);
+  const confirmBulkDelete = () => {
+    setPostsToDelete(Array.from(selectedPosts));
+    setIsDeleteModalOpen(true);
+  };
+
+  const confirmDelete = (id: string) => {
+    setPostsToDelete([id]);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleBulkDelete = async () => {
+    if (postsToDelete.length > 0) {
+      try {
+        await bulkDeleteSocialPost(postsToDelete);
+        setSelectedPosts(new Set());
+        setIsDeleteModalOpen(false);
+        setPostsToDelete([]);
+        toast.success(`Deleted ${postsToDelete.length === 1 ? 'post' : `${postsToDelete.length} posts`}`);
+      } catch (error) {
+        // Error handled by handleFirestoreError
+      }
     }
   };
 
@@ -153,13 +181,17 @@ export default function ContentPlan() {
     setIsEditModalOpen(true);
   };
 
-  const handleSaveEdit = (e: React.FormEvent) => {
+  const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingPost) {
-      updateSocialPost(editingPost.id, editingPost);
-      setIsEditModalOpen(false);
-      setEditingPost(null);
-      toast.success("Post updated successfully!");
+      try {
+        await updateSocialPost(editingPost.id, editingPost);
+        setIsEditModalOpen(false);
+        setEditingPost(null);
+        toast.success("Post updated successfully!");
+      } catch (error) {
+        // Error handled by handleFirestoreError
+      }
     }
   };
 
@@ -168,17 +200,21 @@ export default function ContentPlan() {
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-900">Content Plan</h2>
         <div className="flex space-x-3">
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileUpload}
-            accept=".xlsx, .xls, .csv"
-            className="hidden"
-          />
-          <Button onClick={() => fileInputRef.current?.click()}>
-            <Upload className="h-4 w-4 mr-2" />
-            Import Excel/CSV
-          </Button>
+          {canManageContent && (
+            <>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileUpload}
+                accept=".xlsx, .xls, .csv"
+                className="hidden"
+              />
+              <Button onClick={() => fileInputRef.current?.click()}>
+                <Upload className="h-4 w-4 mr-2" />
+                Import Excel/CSV
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -233,7 +269,7 @@ export default function ContentPlan() {
                   </div>
                   
                   <div className="flex flex-wrap gap-2">
-                    {selectedPosts.size > 0 && (
+                    {selectedPosts.size > 0 && canManageContent && (
                       <>
                         <Button variant="outline" size="sm" onClick={() => handleBulkMarkDone(true)}>
                           <CheckCircle className="h-4 w-4 mr-2" />
@@ -243,16 +279,18 @@ export default function ContentPlan() {
                           <Circle className="h-4 w-4 mr-2" />
                           Mark Undone
                         </Button>
-                        <Button variant="outline" size="sm" onClick={handleBulkDelete} className="text-red-600 hover:text-red-700 hover:bg-red-50">
+                        <Button variant="outline" size="sm" onClick={confirmBulkDelete} className="text-red-600 hover:text-red-700 hover:bg-red-50">
                           <Trash2 className="h-4 w-4 mr-2" />
                           Delete
                         </Button>
                       </>
                     )}
-                    <Button variant="outline" size="sm" onClick={() => setIsArchiveModalOpen(true)}>
-                      <Archive className="h-4 w-4 mr-2" />
-                      Archive & Clear Plan
-                    </Button>
+                    {canManageContent && socialPosts.length > 0 && (
+                      <Button variant="outline" size="sm" onClick={() => setIsArchiveModalOpen(true)}>
+                        <Archive className="h-4 w-4 mr-2" />
+                        Archive & Clear Plan
+                      </Button>
+                    )}
                   </div>
                 </div>
               )}
@@ -279,13 +317,15 @@ export default function ContentPlan() {
                               <Calendar className="h-4 w-4 mr-1.5 text-gray-500" />
                               {post.date || 'No Date'}
                             </div>
-                            <button 
-                              onClick={() => toggleSocialPostDone(post.id)}
-                              className={`flex items-center justify-center rounded-full p-1 transition-colors ${post.isDone ? 'text-green-600 hover:bg-green-50' : 'text-gray-400 hover:bg-gray-100'}`}
-                              title={post.isDone ? "Mark as Undone" : "Mark as Done"}
-                            >
-                              {post.isDone ? <CheckCircle className="h-6 w-6" /> : <Circle className="h-6 w-6" />}
-                            </button>
+                            {canManageContent && (
+                              <button 
+                                onClick={() => toggleSocialPostDone(post.id)}
+                                className={`flex items-center justify-center rounded-full p-1 transition-colors ${post.isDone ? 'text-green-600 hover:bg-green-50' : 'text-gray-400 hover:bg-gray-100'}`}
+                                title={post.isDone ? "Mark as Undone" : "Mark as Done"}
+                              >
+                                {post.isDone ? <CheckCircle className="h-6 w-6" /> : <Circle className="h-6 w-6" />}
+                              </button>
+                            )}
                           </div>
                           
                           {post.type && (
@@ -315,12 +355,16 @@ export default function ContentPlan() {
                               <Button variant="ghost" size="sm" onClick={() => copyToClipboard(post.copyCaption)} className="h-8 px-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50">
                                 <Copy className="h-4 w-4 mr-1.5" /> Copy
                               </Button>
-                              <Button variant="ghost" size="sm" onClick={() => handleEditPost(post)} className="h-8 px-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100">
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="sm" onClick={() => deleteSocialPost(post.id)} className="h-8 px-2 text-red-500 hover:text-red-600 hover:bg-red-50">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                              {canManageContent && (
+                                <>
+                                  <Button variant="ghost" size="sm" onClick={() => handleEditPost(post)} className="h-8 px-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100">
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button variant="ghost" size="sm" onClick={() => confirmDelete(post.id)} className="h-8 px-2 text-red-500 hover:text-red-600 hover:bg-red-50">
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </>
+                              )}
                             </div>
                           </div>
                           <div className="bg-gray-50 p-3 rounded-md border border-gray-100 text-sm text-gray-800 whitespace-pre-wrap flex-1">
@@ -338,10 +382,12 @@ export default function ContentPlan() {
                   <p className="text-gray-500 max-w-md mx-auto mb-6">
                     Import your monthly content plan from an Excel or CSV file. Ensure your columns have headers like "Date", "Type", "Theme", "Visual Description", and "Caption".
                   </p>
-                  <Button onClick={() => fileInputRef.current?.click()}>
-                    <Upload className="h-4 w-4 mr-2" />
-                    Import Excel/CSV
-                  </Button>
+                  {canManageContent && (
+                    <Button onClick={() => fileInputRef.current?.click()}>
+                      <Upload className="h-4 w-4 mr-2" />
+                      Import Excel/CSV
+                    </Button>
+                  )}
                 </div>
               )}
             </div>
@@ -483,6 +529,26 @@ export default function ContentPlan() {
             </div>
           </form>
         )}
+      </Modal>
+
+      <Modal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        title="Confirm Deletion"
+      >
+        <div className="space-y-4">
+          <p className="text-gray-600">
+            Are you sure you want to delete {postsToDelete.length === 1 ? 'this post' : `${postsToDelete.length} posts`}? This action cannot be undone.
+          </p>
+          <div className="flex justify-end space-x-3">
+            <Button variant="ghost" onClick={() => setIsDeleteModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="danger" onClick={handleBulkDelete}>
+              Delete {postsToDelete.length === 1 ? 'Post' : 'Posts'}
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

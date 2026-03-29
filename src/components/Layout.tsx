@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Package, FileText, Megaphone, Menu, X, Settings as SettingsIcon } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { LayoutDashboard, Package, FileText, Megaphone, Menu, X, Settings as SettingsIcon, LogOut, User as UserIcon } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useStore } from '../store';
+import { auth } from '../firebase';
+import { toast } from 'sonner';
 
 const navItems = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -14,8 +16,26 @@ const navItems = [
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { companySettings } = useStore();
+  const { companySettings, userProfile } = useStore();
+
+  const filteredNavItems = navItems.filter(item => {
+    if (item.name === 'Content Plan' && userProfile?.role === 'Ads Manager') return false;
+    if (item.name === 'Ads Plan' && userProfile?.role === 'Content Manager') return false;
+    return true;
+  });
+
+  const handleSignOut = async () => {
+    try {
+      await auth.signOut();
+      toast.success('Signed out successfully');
+      navigate('/login');
+    } catch (error) {
+      console.error('Sign out error:', error);
+      toast.error('Failed to sign out');
+    }
+  };
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
@@ -57,7 +77,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
         <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
-          {navItems.map((item) => {
+          {filteredNavItems.map((item) => {
             const isActive = location.pathname === item.href || 
               (item.href !== '/' && location.pathname.startsWith(item.href));
             return (
@@ -84,6 +104,26 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             );
           })}
         </nav>
+
+        {/* User Profile & Sign Out */}
+        <div className="p-4 border-t border-gray-200 bg-gray-50">
+          <div className="flex items-center gap-3 mb-4 px-2">
+            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+              <UserIcon className="h-6 w-6" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-gray-900 truncate">{userProfile?.name}</p>
+              <p className="text-xs text-gray-500 truncate">{userProfile?.role}</p>
+            </div>
+          </div>
+          <button
+            onClick={handleSignOut}
+            className="w-full flex items-center px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-md transition-colors"
+          >
+            <LogOut className="mr-3 h-5 w-5" />
+            Sign Out
+          </button>
+        </div>
       </div>
 
       {/* Main content */}

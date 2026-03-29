@@ -3,20 +3,27 @@ import { useStore } from '../store';
 import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { Modal } from '../components/ui/Modal';
 import { Link } from 'react-router-dom';
 import { getEmbedUrl } from '../lib/utils';
-import { ExternalLink, Plus, Trash2, Video, ChevronDown, ChevronUp, MessageSquare } from 'lucide-react';
-import { AdPlatform, AdStatus, AdItem } from '../types';
+import { ExternalLink, Plus, Trash2, Video, ChevronDown, ChevronUp, MessageSquare, AlertTriangle } from 'lucide-react';
+import { AdPlatform, AdStatus } from '../types';
 
 export default function AdsPlan() {
-  const { products, adItems, addAd, updateAd, addAdFeedback } = useStore();
+  const { products, adItems, addAd, updateAd, addAdFeedback, userProfile } = useStore();
   const [activeTab, setActiveTab] = useState<AdPlatform>('Facebook');
   const [expandedProducts, setExpandedProducts] = useState<Set<string>>(new Set());
   const [newLinkInputs, setNewLinkInputs] = useState<Record<string, string>>({});
   const [newFeedbackInputs, setNewFeedbackInputs] = useState<Record<string, string>>({});
+  
+  // Confirmation Modal State
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ adId: string, linkIndex: number } | null>(null);
 
   const platforms: AdPlatform[] = ['Facebook', 'TikTok', 'Google'];
   const statuses: AdStatus[] = ['Planning', 'Ready to Live Ad', 'Live Ad'];
+
+  const isEditable = userProfile?.role === 'Admin' || userProfile?.role === 'Ads Manager';
 
   const toggleProduct = (productId: string) => {
     const newExpanded = new Set(expandedProducts);
@@ -32,11 +39,13 @@ export default function AdsPlan() {
     return adItems.find(ad => ad.productId === productId && ad.platform === platform);
   };
 
-  const handleStatusChange = (adId: string | undefined, productId: string, newStatus: AdStatus) => {
+  const handleStatusChange = async (adId: string | undefined, productId: string, newStatus: AdStatus) => {
+    if (!isEditable) return;
+    
     if (adId) {
-      updateAd(adId, { status: newStatus });
+      await updateAd(adId, { status: newStatus });
     } else {
-      addAd({
+      await addAd({
         productId,
         platform: activeTab,
         status: newStatus,
@@ -45,17 +54,19 @@ export default function AdsPlan() {
     }
   };
 
-  const handleAddMediaLink = (adId: string | undefined, productId: string) => {
+  const handleAddMediaLink = async (adId: string | undefined, productId: string) => {
+    if (!isEditable) return;
+    
     const link = newLinkInputs[productId];
     if (!link || !link.trim()) return;
     
     if (adId) {
       const ad = adItems.find(a => a.id === adId);
       if (ad) {
-        updateAd(adId, { mediaLinks: [...ad.mediaLinks, link] });
+        await updateAd(adId, { mediaLinks: [...ad.mediaLinks, link] });
       }
     } else {
-      addAd({
+      await addAd({
         productId,
         platform: activeTab,
         status: 'Planning',
@@ -66,20 +77,33 @@ export default function AdsPlan() {
     setNewLinkInputs({ ...newLinkInputs, [productId]: '' });
   };
 
-  const handleRemoveMediaLink = (adId: string, linkIndex: number) => {
+  const openDeleteModal = (adId: string, linkIndex: number) => {
+    setDeleteTarget({ adId, linkIndex });
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget || !isEditable) return;
+    
+    const { adId, linkIndex } = deleteTarget;
     const ad = adItems.find(a => a.id === adId);
     if (ad) {
       const newLinks = [...ad.mediaLinks];
       newLinks.splice(linkIndex, 1);
-      updateAd(adId, { mediaLinks: newLinks });
+      await updateAd(adId, { mediaLinks: newLinks });
     }
+    
+    setIsDeleteModalOpen(false);
+    setDeleteTarget(null);
   };
 
-  const handleAddFeedback = (productId: string) => {
+  const handleAddFeedback = async (productId: string) => {
+    if (!isEditable) return;
+    
     const text = newFeedbackInputs[productId];
     if (!text || !text.trim()) return;
 
-    addAdFeedback({
+    await addAdFeedback({
       productId,
       text
     });
@@ -172,19 +196,29 @@ export default function AdsPlan() {
                           Website <ExternalLink className="h-3 w-3 ml-1" />
                         </a>
                       )}
-                      <select
-                        value={status}
-                        onChange={(e) => handleStatusChange(ad?.id, product.id, e.target.value as AdStatus)}
-                        className={`text-sm font-medium rounded-full px-3 py-1 border-0 ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6 ${
-                          status === 'Live Ad' ? 'bg-green-50 text-green-700 ring-green-600/20 focus:ring-green-600' :
-                          status === 'Ready to Live Ad' ? 'bg-blue-50 text-blue-700 ring-blue-600/20 focus:ring-blue-600' :
-                          'bg-yellow-50 text-yellow-800 ring-yellow-600/20 focus:ring-yellow-600'
-                        }`}
-                      >
-                        {statuses.map(s => (
-                          <option key={s} value={s}>{s}</option>
-                        ))}
-                      </select>
+                      {isEditable ? (
+                        <select
+                          value={status}
+                          onChange={(e) => handleStatusChange(ad?.id, product.id, e.target.value as AdStatus)}
+                          className={`text-sm font-medium rounded-full px-3 py-1 border-0 ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6 ${
+                            status === 'Live Ad' ? 'bg-green-50 text-green-700 ring-green-600/20 focus:ring-green-600' :
+                            status === 'Ready to Live Ad' ? 'bg-blue-50 text-blue-700 ring-blue-600/20 focus:ring-blue-600' :
+                            'bg-yellow-50 text-yellow-800 ring-yellow-600/20 focus:ring-yellow-600'
+                          }`}
+                        >
+                          {statuses.map(s => (
+                            <option key={s} value={s}>{s}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className={`text-sm font-medium rounded-full px-3 py-1 ring-1 ring-inset ${
+                          status === 'Live Ad' ? 'bg-green-50 text-green-700 ring-green-600/20' :
+                          status === 'Ready to Live Ad' ? 'bg-blue-50 text-blue-700 ring-blue-600/20' :
+                          'bg-yellow-50 text-yellow-800 ring-yellow-600/20'
+                        }`}>
+                          {status}
+                        </span>
+                      )}
                       <button onClick={() => toggleProduct(product.id)} className="text-gray-400 hover:text-gray-600">
                         {isExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
                       </button>
@@ -193,23 +227,25 @@ export default function AdsPlan() {
 
                   {isExpanded && (
                     <CardContent className="p-4 bg-white">
-                      <div className="mb-4 flex flex-col sm:flex-row gap-2">
-                        <Input
-                          placeholder="Paste Facebook post link or Google Drive link here..."
-                          value={newLinkInputs[product.id] || ''}
-                          onChange={(e) => setNewLinkInputs({ ...newLinkInputs, [product.id]: e.target.value })}
-                          className="flex-1"
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              handleAddMediaLink(ad?.id, product.id);
-                            }
-                          }}
-                        />
-                        <Button onClick={() => handleAddMediaLink(ad?.id, product.id)} className="w-full sm:w-auto">
-                          <Plus className="h-4 w-4 mr-2" /> Add Video
-                        </Button>
-                      </div>
+                      {isEditable && (
+                        <div className="mb-4 flex flex-col sm:flex-row gap-2">
+                          <Input
+                            placeholder="Paste Facebook post link or Google Drive link here..."
+                            value={newLinkInputs[product.id] || ''}
+                            onChange={(e) => setNewLinkInputs({ ...newLinkInputs, [product.id]: e.target.value })}
+                            className="flex-1"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleAddMediaLink(ad?.id, product.id);
+                              }
+                            }}
+                          />
+                          <Button onClick={() => handleAddMediaLink(ad?.id, product.id)} className="w-full sm:w-auto">
+                            <Plus className="h-4 w-4 mr-2" /> Add Video
+                          </Button>
+                        </div>
+                      )}
 
                       {videoCount > 0 ? (
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -233,13 +269,15 @@ export default function AdsPlan() {
                                     </a>
                                   </div>
                                 )}
-                                <button
-                                  onClick={() => handleRemoveMediaLink(ad.id, idx)}
-                                  className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
-                                  title="Remove Video"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </button>
+                                {isEditable && (
+                                  <button
+                                    onClick={() => openDeleteModal(ad.id, idx)}
+                                    className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                                    title="Remove Video"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                )}
                               </div>
                             );
                           })}
@@ -255,23 +293,27 @@ export default function AdsPlan() {
                           <MessageSquare className="h-4 w-4 mr-2 text-blue-500" />
                           Add Note / Feedback
                         </h4>
-                        <div className="flex flex-col sm:flex-row gap-2">
-                          <Input
-                            placeholder="Type a note or feedback for this product..."
-                            value={newFeedbackInputs[product.id] || ''}
-                            onChange={(e) => setNewFeedbackInputs({ ...newFeedbackInputs, [product.id]: e.target.value })}
-                            className="flex-1"
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                handleAddFeedback(product.id);
-                              }
-                            }}
-                          />
-                          <Button onClick={() => handleAddFeedback(product.id)} variant="outline" className="w-full sm:w-auto">
-                            Add Note
-                          </Button>
-                        </div>
+                        {isEditable ? (
+                          <div className="flex flex-col sm:flex-row gap-2">
+                            <Input
+                              placeholder="Type a note or feedback for this product..."
+                              value={newFeedbackInputs[product.id] || ''}
+                              onChange={(e) => setNewFeedbackInputs({ ...newFeedbackInputs, [product.id]: e.target.value })}
+                              className="flex-1"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  handleAddFeedback(product.id);
+                                }
+                              }}
+                            />
+                            <Button onClick={() => handleAddFeedback(product.id)} variant="outline" className="w-full sm:w-auto">
+                              Add Note
+                            </Button>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-gray-500 italic">Only Admins and Ads Managers can add feedback.</p>
+                        )}
                       </div>
                     </CardContent>
                   )}
@@ -281,6 +323,31 @@ export default function AdsPlan() {
           )}
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        title="Remove Video"
+      >
+        <div className="space-y-4">
+          <div className="flex items-center space-x-3 text-amber-600">
+            <AlertTriangle className="h-6 w-6" />
+            <p className="font-medium">Are you sure you want to remove this video link?</p>
+          </div>
+          <p className="text-sm text-gray-500">
+            This action cannot be undone. The video link will be permanently removed from this ad plan.
+          </p>
+          <div className="flex justify-end space-x-3 mt-6">
+            <Button variant="outline" onClick={() => setIsDeleteModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="danger" onClick={handleConfirmDelete}>
+              Remove Video
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

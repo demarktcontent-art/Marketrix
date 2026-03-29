@@ -1,0 +1,192 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Fields: id, name, email, password, role, approvedDevices, pendingDevices, createdAt
+    //
+    // Collection: products
+    // Fields: id, name, buyingPrice, sellingPrice, websiteLink, createdAt
+    //
+    // Collection: contentItems
+    // Fields: id, productId, title, type, status, scheduledDate, description, createdAt
+    //
+    // Collection: socialPosts
+    // Fields: id, date, type, themeProduct, visualDescription, copyCaption, isDone, createdAt
+    //
+    // Collection: adItems
+    // Fields: id, productId, platform, status, mediaLinks, createdAt
+    //
+    // Collection: adFeedbacks
+    // Fields: id, productId, text, isDone, createdAt
+    //
+    // Collection: pastReports
+    // Fields: id, monthName, totalPosts, completedPosts, completionRate, archivedAt
+    //
+    // Collection: settings/company
+    // Fields: name, logoUrl
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        (request.auth.token.email == "demarkt.content@gmail.com" && request.auth.token.email_verified == true) ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin'
+      );
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasRequiredFields(['id', 'name', 'email', 'role', 'createdAt']) &&
+             data.id is string && data.name is string && data.name.size() > 0 &&
+             isValidEmail(data.email) &&
+             data.role in ['Admin', 'Ads Manager', 'Content Manager'] &&
+             data.createdAt is string;
+    }
+
+    function isValidProduct(data) {
+      return hasRequiredFields(['id', 'name', 'buyingPrice', 'sellingPrice', 'createdAt']) &&
+             data.id is string && data.name is string && data.name.size() > 0 &&
+             data.buyingPrice is number && data.sellingPrice is number &&
+             data.createdAt is string;
+    }
+
+    function isValidContentItem(data) {
+      return hasRequiredFields(['id', 'productId', 'title', 'type', 'status', 'scheduledDate', 'createdAt']) &&
+             data.id is string && data.productId is string && data.title is string &&
+             data.type in ['Post', 'Reel', 'Story', 'Blog', 'Video'] &&
+             data.status in ['Idea', 'In Progress', 'Review', 'Published'] &&
+             data.createdAt is string;
+    }
+
+    function isValidSocialPost(data) {
+      return hasRequiredFields(['id', 'date', 'type', 'themeProduct', 'visualDescription', 'copyCaption', 'isDone', 'createdAt']) &&
+             data.id is string && data.date is string && data.type is string &&
+             data.isDone is bool && data.createdAt is string;
+    }
+
+    function isValidAdItem(data) {
+      return hasRequiredFields(['id', 'productId', 'platform', 'status', 'mediaLinks', 'createdAt']) &&
+             data.id is string && data.productId is string &&
+             data.platform in ['Facebook', 'Google', 'TikTok'] &&
+             data.status in ['Planning', 'Ready to Live Ad', 'Live Ad'] &&
+             data.mediaLinks is list && data.createdAt is string;
+    }
+
+    function isValidAdFeedback(data) {
+      return hasRequiredFields(['id', 'productId', 'text', 'createdAt']) &&
+             data.id is string && data.productId is string && data.text is string &&
+             data.createdAt is string;
+    }
+
+    function isValidContentReport(data) {
+      return hasRequiredFields(['id', 'monthName', 'totalPosts', 'completedPosts', 'completionRate', 'archivedAt']) &&
+             data.id is string && data.monthName is string && data.totalPosts is number &&
+             data.completedPosts is number && data.completionRate is number &&
+             data.archivedAt is string;
+    }
+
+    function isValidCompanySettings(data) {
+      return hasRequiredFields(['name']) && data.name is string && data.name.size() > 0;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      // Allow reading profiles for login and session management
+      // We allow 'get' for everyone so the app can fetch the profile after login
+      // We allow 'list' for the bootstrap check
+      allow read: if true;
+      
+      // Only Admins can create or delete users
+      // Exception: Allow creation if the database is empty (bootstrap)
+      allow create: if isAdmin() || (request.resource.data.email == "demarkt.content@gmail.com");
+      allow delete: if isAdmin();
+      
+      // Allow updates if Admin OR if a user is updating their own pendingDevices during login
+      allow update: if isAdmin() || (
+        isAuthenticated() && request.auth.uid == userId && 
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pendingDevices'])
+      );
+    }
+
+    match /products/{productId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidProduct(request.resource.data);
+      allow update: if isAuthenticated() && isValidProduct(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /contentItems/{contentId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidContentItem(request.resource.data);
+      allow update: if isAuthenticated() && isValidContentItem(request.resource.data);
+      allow delete: if isAuthenticated();
+    }
+
+    match /socialPosts/{postId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidSocialPost(request.resource.data);
+      allow update: if isAuthenticated() && isValidSocialPost(request.resource.data);
+      allow delete: if isAuthenticated();
+    }
+
+    match /adItems/{adId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidAdItem(request.resource.data);
+      allow update: if isAuthenticated() && isValidAdItem(request.resource.data);
+      allow delete: if isAuthenticated();
+    }
+
+    match /adFeedbacks/{feedbackId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidAdFeedback(request.resource.data);
+      allow update: if isAuthenticated() && isValidAdFeedback(request.resource.data);
+      allow delete: if isAuthenticated();
+    }
+
+    match /pastReports/{reportId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidContentReport(request.resource.data);
+      allow update: if isAuthenticated() && isValidContentReport(request.resource.data);
+      allow delete: if isAuthenticated();
+    }
+
+    match /settings/company {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() && isValidCompanySettings(request.resource.data);
+    }
+  }
+}

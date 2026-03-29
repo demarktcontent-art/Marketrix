@@ -1,11 +1,19 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useStore } from '../store';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
-import { Package, FileText, Megaphone, TrendingUp, CalendarCheck, MessageSquare, Trash2, CheckCircle2, Circle } from 'lucide-react';
+import { Modal } from '../components/ui/Modal';
+import { Button } from '../components/ui/Button';
+import { Package, FileText, Megaphone, TrendingUp, CalendarCheck, MessageSquare, Trash2, CheckCircle2, Circle, AlertTriangle } from 'lucide-react';
 
 export default function Dashboard() {
-  const { products, contentItems, adItems, pastReports, adFeedbacks, deleteAdFeedback, toggleAdFeedbackDone } = useStore();
+  const { products, contentItems, adItems, pastReports, adFeedbacks, deleteAdFeedback, toggleAdFeedbackDone, userProfile } = useStore();
   
+  // Confirmation Modal State
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [feedbackToDelete, setFeedbackToDelete] = useState<string | null>(null);
+
+  const isAdsManager = userProfile?.role === 'Admin' || userProfile?.role === 'Ads Manager';
+
   // Count unique products that have at least one ad in "Live Ad" status
   const liveAdProductIds = new Set(adItems.filter(ad => ad.status === 'Live Ad').map(ad => ad.productId));
   const liveAdProductsCount = liveAdProductIds.size;
@@ -16,6 +24,19 @@ export default function Dashboard() {
 
   const getProductName = (id: string) => {
     return products.find(p => p.id === id)?.name || 'Unknown Product';
+  };
+
+  const openDeleteModal = (id: string) => {
+    setFeedbackToDelete(id);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (feedbackToDelete) {
+      await deleteAdFeedback(feedbackToDelete);
+      setIsDeleteModalOpen(false);
+      setFeedbackToDelete(null);
+    }
   };
 
   return (
@@ -83,8 +104,9 @@ export default function Dashboard() {
                     <div className="flex justify-between items-start mb-2">
                       <div className="flex items-center space-x-2">
                         <button 
-                          onClick={() => toggleAdFeedbackDone(feedback.id)}
-                          className={`flex-shrink-0 focus:outline-none ${feedback.isDone ? 'text-green-500' : 'text-gray-300 hover:text-gray-400'}`}
+                          onClick={() => isAdsManager && toggleAdFeedbackDone(feedback.id)}
+                          disabled={!isAdsManager}
+                          className={`flex-shrink-0 focus:outline-none ${!isAdsManager ? 'cursor-default' : ''} ${feedback.isDone ? 'text-green-500' : 'text-gray-300 hover:text-gray-400'}`}
                         >
                           {feedback.isDone ? <CheckCircle2 className="h-5 w-5" /> : <Circle className="h-5 w-5" />}
                         </button>
@@ -99,13 +121,15 @@ export default function Dashboard() {
                     <p className={`text-sm whitespace-pre-wrap ml-7 ${feedback.isDone ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
                       {feedback.text}
                     </p>
-                    <button
-                      onClick={() => deleteAdFeedback(feedback.id)}
-                      className="absolute top-2 right-2 p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
-                      title="Delete Feedback"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    {isAdsManager && (
+                      <button
+                        onClick={() => openDeleteModal(feedback.id)}
+                        className="absolute top-2 right-2 p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Delete Feedback"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
                 ))
               ) : (
@@ -165,6 +189,31 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        title="Delete Feedback"
+      >
+        <div className="space-y-4">
+          <div className="flex items-center space-x-3 text-amber-600">
+            <AlertTriangle className="h-6 w-6" />
+            <p className="font-medium">Are you sure you want to delete this feedback?</p>
+          </div>
+          <p className="text-sm text-gray-500">
+            This action cannot be undone. The feedback will be permanently removed.
+          </p>
+          <div className="flex justify-end space-x-3 mt-6">
+            <Button variant="outline" onClick={() => setIsDeleteModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="danger" onClick={handleConfirmDelete}>
+              Delete Feedback
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

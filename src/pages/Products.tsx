@@ -8,9 +8,13 @@ import { Modal } from '../components/ui/Modal';
 import { Product } from '../types';
 
 export default function Products() {
-  const { products, addProduct, updateProduct, deleteProduct } = useStore();
+  const { products, addProduct, updateProduct, deleteProduct, userProfile } = useStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<string | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+
+  const canManageProducts = userProfile?.role === 'Admin' || userProfile?.role === 'Ads Manager';
 
   const [formData, setFormData] = useState({
     name: '',
@@ -19,7 +23,7 @@ export default function Products() {
     websiteLink: '',
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const productData = {
       name: formData.name,
@@ -28,15 +32,19 @@ export default function Products() {
       websiteLink: formData.websiteLink,
     };
 
-    if (editingProduct) {
-      updateProduct(editingProduct.id, productData);
-    } else {
-      addProduct(productData);
-    }
+    try {
+      if (editingProduct) {
+        await updateProduct(editingProduct.id, productData);
+      } else {
+        await addProduct(productData);
+      }
 
-    setIsModalOpen(false);
-    setEditingProduct(null);
-    setFormData({ name: '', buyingPrice: '', sellingPrice: '', websiteLink: '' });
+      setIsModalOpen(false);
+      setEditingProduct(null);
+      setFormData({ name: '', buyingPrice: '', sellingPrice: '', websiteLink: '' });
+    } catch (error) {
+      // Error handled by handleFirestoreError
+    }
   };
 
   const openEditModal = (product: Product) => {
@@ -50,18 +58,37 @@ export default function Products() {
     setIsModalOpen(true);
   };
 
+  const confirmDelete = (id: string) => {
+    setProductToDelete(id);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (productToDelete) {
+      try {
+        await deleteProduct(productToDelete);
+        setIsDeleteModalOpen(false);
+        setProductToDelete(null);
+      } catch (error) {
+        // Error handled by handleFirestoreError
+      }
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-gray-900">Products</h2>
-        <Button onClick={() => {
-          setEditingProduct(null);
-          setFormData({ name: '', buyingPrice: '', sellingPrice: '', websiteLink: '' });
-          setIsModalOpen(true);
-        }}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Product
-        </Button>
+        {canManageProducts && (
+          <Button onClick={() => {
+            setEditingProduct(null);
+            setFormData({ name: '', buyingPrice: '', sellingPrice: '', websiteLink: '' });
+            setIsModalOpen(true);
+          }}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Product
+          </Button>
+        )}
       </div>
 
       <div className="bg-white shadow-sm rounded-lg border border-gray-200 overflow-x-auto">
@@ -97,18 +124,22 @@ export default function Products() {
                   ) : '-'}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <button onClick={() => openEditModal(product)} className="text-gray-400 hover:text-blue-600 mr-3">
-                    <Edit className="h-4 w-4" />
-                  </button>
-                  <button onClick={() => deleteProduct(product.id)} className="text-gray-400 hover:text-red-600">
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  {canManageProducts && (
+                    <div className="flex justify-end space-x-2">
+                      <button onClick={() => openEditModal(product)} className="text-gray-400 hover:text-blue-600">
+                        <Edit className="h-4 w-4" />
+                      </button>
+                      <button onClick={() => confirmDelete(product.id)} className="text-gray-400 hover:text-red-600">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
                 </td>
               </tr>
             ))}
             {products.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
                   No products found. Add one to get started.
                 </td>
               </tr>
@@ -174,6 +205,26 @@ export default function Products() {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        title="Confirm Deletion"
+      >
+        <div className="space-y-4">
+          <p className="text-gray-600">
+            Are you sure you want to delete this product? All associated data will be removed. This action cannot be undone.
+          </p>
+          <div className="flex justify-end space-x-3">
+            <Button variant="ghost" onClick={() => setIsDeleteModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="danger" onClick={handleDelete}>
+              Delete Product
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

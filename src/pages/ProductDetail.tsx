@@ -12,7 +12,7 @@ import { ContentType, ContentStatus, AdPlatform, AdStatus } from '../types';
 
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
-  const { products, contentItems, adItems, addContent, addAd, updateAd } = useStore();
+  const { products, contentItems, adItems, addContent, addAd, updateAd, userProfile } = useStore();
   
   const [activeTab, setActiveTab] = useState<'content' | 'ads'>('content');
   const [isContentModalOpen, setIsContentModalOpen] = useState(false);
@@ -21,6 +21,9 @@ export default function ProductDetail() {
   const product = products.find(p => p.id === id);
   const productContent = contentItems.filter(c => c.productId === id);
   const productAds = adItems.filter(a => a.productId === id);
+
+  const isContentManager = userProfile?.role === 'Admin' || userProfile?.role === 'Content Manager';
+  const isAdsManager = userProfile?.role === 'Admin' || userProfile?.role === 'Ads Manager';
 
   const [contentForm, setContentForm] = useState({
     title: '',
@@ -47,9 +50,11 @@ export default function ProductDetail() {
     );
   }
 
-  const handleContentSubmit = (e: React.FormEvent) => {
+  const handleContentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    addContent({
+    if (!isContentManager) return;
+    
+    await addContent({
       productId: product.id,
       title: contentForm.title,
       type: contentForm.type,
@@ -61,17 +66,19 @@ export default function ProductDetail() {
     setContentForm({ title: '', type: 'Post', status: 'Idea', scheduledDate: '', description: '' });
   };
 
-  const handleAdSubmit = (e: React.FormEvent) => {
+  const handleAdSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isAdsManager) return;
+    
     const existingAd = adItems.find(a => a.productId === product.id && a.platform === adForm.platform);
     
     if (existingAd) {
-      updateAd(existingAd.id, {
+      await updateAd(existingAd.id, {
         status: adForm.status,
         mediaLinks: adForm.mediaLink ? [...existingAd.mediaLinks, adForm.mediaLink] : existingAd.mediaLinks
       });
     } else {
-      addAd({
+      await addAd({
         productId: product.id,
         platform: adForm.platform,
         status: adForm.status,
@@ -152,9 +159,11 @@ export default function ProductDetail() {
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <h3 className="text-lg font-medium text-gray-900">Content Ideas & Schedule</h3>
-                <Button size="sm" onClick={() => setIsContentModalOpen(true)}>
-                  <Plus className="h-4 w-4 mr-2" /> Add Content
-                </Button>
+                {isContentManager && (
+                  <Button size="sm" onClick={() => setIsContentModalOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" /> Add Content
+                  </Button>
+                )}
               </div>
               
               {productContent.length > 0 ? (
@@ -195,9 +204,11 @@ export default function ProductDetail() {
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <h3 className="text-lg font-medium text-gray-900">Ad Campaigns & Media</h3>
-                <Button size="sm" onClick={() => setIsAdModalOpen(true)}>
-                  <Plus className="h-4 w-4 mr-2" /> Add Ad Campaign
-                </Button>
+                {isAdsManager && (
+                  <Button size="sm" onClick={() => setIsAdModalOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" /> Add Ad Campaign
+                  </Button>
+                )}
               </div>
 
               {productAds.length > 0 ? (
