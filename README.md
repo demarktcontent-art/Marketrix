@@ -1,20 +1,33 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Marketrix - Marketing Planner
 
-# Run and deploy your AI Studio app
+A comprehensive marketing planner for managing products, content, and ads.
 
-This contains everything you need to run your app locally.
+## Features
+- Product Management
+- Content Planning (Monthly & Ideas)
+- Ads Planning & Feedback
+- Dashboard with Analytics
+- Settings for Company & Users
 
-View your app in AI Studio: https://ai.studio/apps/80cb9146-597f-44c2-baec-477c5f7ceacd
+## Deployment on Vercel
 
-## Run Locally
+This project is optimized for Vercel deployment.
 
-**Prerequisites:**  Node.js
+1.  **Connect to GitHub**: Push this repository to your GitHub account.
+2.  **Import to Vercel**: Go to [Vercel](https://vercel.com) and import the project.
+3.  **Configure Environment Variables**:
+    -   Add `GEMINI_API_KEY` if you plan to use AI features.
+4.  **Deploy**: Vercel will automatically detect the Vite configuration and deploy the app.
 
+## Local Development
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+```bash
+npm install
+npm run dev
+```
+
+## Build
+
+```bash
+npm run build
+```
