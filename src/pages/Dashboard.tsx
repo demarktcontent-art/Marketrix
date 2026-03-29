@@ -12,7 +12,7 @@ export default function Dashboard() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [feedbackToDelete, setFeedbackToDelete] = useState<string | null>(null);
 
-  const isAdsManager = userProfile?.role === 'Admin' || userProfile?.role === 'Ads Manager';
+  const isAdsManager = userProfile?.permissions?.canManageAds ?? (userProfile?.role === 'Admin' || userProfile?.role === 'Ads Manager');
 
   // Count unique products that have at least one ad in "Live Ad" status
   const liveAdProductIds = new Set(adItems.filter(ad => ad.status === 'Live Ad').map(ad => ad.productId));

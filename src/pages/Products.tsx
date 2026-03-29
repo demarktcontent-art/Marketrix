@@ -14,7 +14,7 @@ export default function Products() {
   const [productToDelete, setProductToDelete] = useState<string | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
-  const canManageProducts = userProfile?.role === 'Admin' || userProfile?.role === 'Ads Manager';
+  const canManageProducts = userProfile?.permissions?.canManageProducts ?? (userProfile?.role === 'Admin' || userProfile?.role === 'Ads Manager');
 
   const [formData, setFormData] = useState({
     name: '',

@@ -14,7 +14,44 @@ import {
   limit
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from './firebase';
-import { Product, ContentItem, AdItem, SocialPost, ContentReport, AdFeedback, User, CompanySettings } from './types';
+import { Product, ContentItem, AdItem, SocialPost, ContentReport, AdFeedback, User, CompanySettings, UserRole, UserPermissions } from './types';
+
+const getDefaultPermissions = (role: UserRole): UserPermissions => {
+  switch (role) {
+    case 'Admin':
+      return {
+        canManageProducts: true,
+        canManageContent: true,
+        canManageAds: true,
+        canManageUsers: true,
+        canEditSettings: true,
+      };
+    case 'Ads Manager':
+      return {
+        canManageProducts: true,
+        canManageContent: true,
+        canManageAds: true,
+        canManageUsers: false,
+        canEditSettings: false,
+      };
+    case 'Content Manager':
+      return {
+        canManageProducts: false,
+        canManageContent: true,
+        canManageAds: false,
+        canManageUsers: false,
+        canEditSettings: false,
+      };
+    default:
+      return {
+        canManageProducts: false,
+        canManageContent: false,
+        canManageAds: false,
+        canManageUsers: false,
+        canEditSettings: false,
+      };
+  }
+};
 
 interface AppState {
   currentUser: { uid: string; email: string } | null;
@@ -108,6 +145,7 @@ export const useStore = create<AppState>((set, get) => ({
             email,
             password,
             role: 'Admin',
+            permissions: getDefaultPermissions('Admin'),
             createdAt: new Date().toISOString()
           };
           await setDoc(doc(db, 'users', id), userData);
@@ -146,6 +184,7 @@ export const useStore = create<AppState>((set, get) => ({
         email,
         password,
         role: 'Admin',
+        permissions: getDefaultPermissions('Admin'),
         createdAt: new Date().toISOString()
       };
       await setDoc(doc(db, 'users', id), userData);
@@ -363,6 +402,7 @@ export const useStore = create<AppState>((set, get) => ({
       const newUser: User = { 
         ...user, 
         id, 
+        permissions: user.permissions || getDefaultPermissions(user.role),
         createdAt: new Date().toISOString() 
       };
       await setDoc(doc(db, 'users', id), newUser);

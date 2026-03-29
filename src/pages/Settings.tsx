@@ -24,7 +24,8 @@ export default function Settings() {
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   
-  const isAdmin = userProfile?.role === 'Admin';
+  const canManageUsers = userProfile?.permissions?.canManageUsers ?? (userProfile?.role === 'Admin');
+  const canEditSettings = userProfile?.permissions?.canEditSettings ?? (userProfile?.role === 'Admin');
   
   const [companyName, setCompanyName] = useState(companySettings.name || '');
   const [logoUrl, setLogoUrl] = useState(companySettings.logoUrl || '');
@@ -34,7 +35,14 @@ export default function Settings() {
     name: '',
     email: '',
     password: '',
-    role: 'Ads Manager' as UserRole
+    role: 'Ads Manager' as UserRole,
+    permissions: {
+      canManageProducts: true,
+      canManageContent: true,
+      canManageAds: true,
+      canManageUsers: false,
+      canEditSettings: false,
+    }
   });
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -82,7 +90,19 @@ export default function Settings() {
       
       setIsModalOpen(false);
       setEditingUser(null);
-      setFormData({ name: '', email: '', password: '', role: 'Ads Manager' });
+      setFormData({ 
+        name: '', 
+        email: '', 
+        password: '', 
+        role: 'Ads Manager',
+        permissions: {
+          canManageProducts: true,
+          canManageContent: true,
+          canManageAds: true,
+          canManageUsers: false,
+          canEditSettings: false,
+        }
+      });
     } catch (error) {
       // Error handled by handleFirestoreError in store
     }
@@ -94,7 +114,14 @@ export default function Settings() {
       name: user.name,
       email: user.email,
       password: user.password || '',
-      role: user.role
+      role: user.role,
+      permissions: user.permissions || {
+        canManageProducts: user.role === 'Admin' || user.role === 'Ads Manager',
+        canManageContent: true,
+        canManageAds: user.role === 'Admin' || user.role === 'Ads Manager',
+        canManageUsers: user.role === 'Admin',
+        canEditSettings: user.role === 'Admin',
+      }
     });
     setIsModalOpen(true);
   };
@@ -130,7 +157,7 @@ export default function Settings() {
     }
   };
 
-  if (!isAdmin) {
+  if (!canEditSettings && !canManageUsers) {
     return (
       <div className="space-y-6">
         <div>
@@ -170,7 +197,7 @@ export default function Settings() {
           <div className="flex">
             <Shield className="h-5 w-5 text-yellow-400 mr-3" />
             <div>
-              <h3 className="text-sm font-medium text-yellow-800">Admin Access Required</h3>
+              <h3 className="text-sm font-medium text-yellow-800">Access Restricted</h3>
               <p className="text-sm text-yellow-700 mt-1">
                 You do not have permission to manage users or edit company settings. Please contact an administrator for changes.
               </p>
@@ -188,154 +215,172 @@ export default function Settings() {
           <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
           <p className="text-gray-500 mt-1">Manage users and roles</p>
         </div>
-        <Button onClick={() => {
-          setEditingUser(null);
-          setFormData({ name: '', email: '', password: '', role: 'Ads Manager' });
-          setIsModalOpen(true);
-        }}>
-          <Plus className="w-4 h-4 mr-2" />
-          Add User
-        </Button>
+        {canManageUsers && (
+          <Button onClick={() => {
+            setEditingUser(null);
+            setFormData({ 
+              name: '', 
+              email: '', 
+              password: '', 
+              role: 'Ads Manager',
+              permissions: {
+                canManageProducts: true,
+                canManageContent: true,
+                canManageAds: true,
+                canManageUsers: false,
+                canEditSettings: false,
+              }
+            });
+            setIsModalOpen(true);
+          }}>
+            <Plus className="w-4 h-4 mr-2" />
+            Add User
+          </Button>
+        )}
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="p-6 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-            <Building2 className="w-5 h-5 mr-2 text-blue-600" />
-            Company Settings
-          </h2>
-          <p className="text-sm text-gray-500 mt-1">
-            Update your company name and logo.
-          </p>
-        </div>
-        <div className="p-6 space-y-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
-            <div className="flex gap-3 max-w-md">
-              <Input 
-                value={companyName} 
-                onChange={(e) => setCompanyName(e.target.value)} 
-                placeholder="MarketPlan"
-              />
-              <Button onClick={handleSaveCompanyName}>Save</Button>
-            </div>
+      {canEditSettings && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="p-6 border-b border-gray-200">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+              <Building2 className="w-5 h-5 mr-2 text-blue-600" />
+              Company Settings
+            </h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Update your company name and logo.
+            </p>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Company Logo</label>
-            <div className="flex items-center gap-6">
-              <div className="w-20 h-20 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50 overflow-hidden">
-                {logoUrl ? (
-                  <img src={logoUrl} alt="Company Logo" className="w-full h-full object-contain" />
-                ) : (
-                  <Building2 className="w-8 h-8 text-gray-400" />
-                )}
+          <div className="p-6 space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
+              <div className="flex gap-3 max-w-md">
+                <Input 
+                  value={companyName} 
+                  onChange={(e) => setCompanyName(e.target.value)} 
+                  placeholder="MarketPlan"
+                />
+                <Button onClick={handleSaveCompanyName}>Save</Button>
               </div>
-              <div className="space-y-2">
-                <div className="flex items-center gap-3">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <Upload className="w-4 h-4 mr-2" />
-                    Upload Logo
-                  </Button>
-                  {logoUrl && (
-                    <Button 
-                      variant="ghost" 
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      onClick={() => {
-                        setLogoUrl('');
-                        updateCompanySettings({ logoUrl: undefined });
-                        toast.success('Company logo removed');
-                      }}
-                    >
-                      Remove
-                    </Button>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Company Logo</label>
+              <div className="flex items-center gap-6">
+                <div className="w-20 h-20 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50 overflow-hidden">
+                  {logoUrl ? (
+                    <img src={logoUrl} alt="Company Logo" className="w-full h-full object-contain" />
+                  ) : (
+                    <Building2 className="w-8 h-8 text-gray-400" />
                   )}
                 </div>
-                <p className="text-xs text-gray-500">
-                  Recommended size: 256x256px. Max size: 2MB.
-                </p>
-                <input 
-                  type="file" 
-                  ref={fileInputRef}
-                  accept="image/*" 
-                  onChange={handleLogoUpload} 
-                  className="hidden" 
-                />
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      Upload Logo
+                    </Button>
+                    {logoUrl && (
+                      <Button 
+                        variant="ghost" 
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        onClick={() => {
+                          setLogoUrl('');
+                          updateCompanySettings({ logoUrl: undefined });
+                          toast.success('Company logo removed');
+                        }}
+                      >
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    Recommended size: 256x256px. Max size: 2MB.
+                  </p>
+                  <input 
+                    type="file" 
+                    ref={fileInputRef}
+                    accept="image/*" 
+                    onChange={handleLogoUpload} 
+                    className="hidden" 
+                  />
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="p-6 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-            <Shield className="w-5 h-5 mr-2 text-blue-600" />
-            User Access Control
-          </h2>
-          <p className="text-sm text-gray-500 mt-1">
-            Manage who has access to {companySettings.name || 'MarketPlan'} and what they can do.
-          </p>
-        </div>
-        
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-gray-50 text-gray-500 text-sm">
-                <th className="p-4 font-medium border-b border-gray-200">Name</th>
-                <th className="p-4 font-medium border-b border-gray-200">Email</th>
-                <th className="p-4 font-medium border-b border-gray-200">Role</th>
-                <th className="p-4 font-medium border-b border-gray-200 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {users?.map((user) => (
-                <tr key={user.id} className="hover:bg-gray-50">
-                  <td className="p-4">
-                    <div className="font-medium text-gray-900">{user.name}</div>
-                  </td>
-                  <td className="p-4 text-gray-600">{user.email}</td>
-                  <td className="p-4">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      user.role === 'Admin' ? 'bg-purple-100 text-purple-800' :
-                      user.role === 'Ads Manager' ? 'bg-blue-100 text-blue-800' :
-                      'bg-green-100 text-green-800'
-                    }`}>
-                      {user.role}
-                    </span>
-                    <p className="text-xs text-gray-500 mt-1">{getRoleDescription(user.role)}</p>
-                  </td>
-                  <td className="p-4 text-right">
-                    <div className="flex justify-end space-x-2">
-                      <Button variant="ghost" size="sm" onClick={() => openEditModal(user)}>
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        onClick={() => confirmDelete(user.id)}
-                        disabled={user.role === 'Admin' && users.filter(u => u.role === 'Admin').length === 1}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </td>
+      {canManageUsers && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="p-6 border-b border-gray-200">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+              <Shield className="w-5 h-5 mr-2 text-blue-600" />
+              User Access Control
+            </h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Manage who has access to {companySettings.name || 'MarketPlan'} and what they can do.
+            </p>
+          </div>
+          
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-gray-50 text-gray-500 text-sm">
+                  <th className="p-4 font-medium border-b border-gray-200">Name</th>
+                  <th className="p-4 font-medium border-b border-gray-200">Email</th>
+                  <th className="p-4 font-medium border-b border-gray-200">Role</th>
+                  <th className="p-4 font-medium border-b border-gray-200 text-right">Actions</th>
                 </tr>
-              ))}
-              {(!users || users.length === 0) && (
-                <tr>
-                  <td colSpan={4} className="p-8 text-center text-gray-500">
-                    No users found.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {users?.map((user) => (
+                  <tr key={user.id} className="hover:bg-gray-50">
+                    <td className="p-4">
+                      <div className="font-medium text-gray-900">{user.name}</div>
+                    </td>
+                    <td className="p-4 text-gray-600">{user.email}</td>
+                    <td className="p-4">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        user.role === 'Admin' ? 'bg-purple-100 text-purple-800' :
+                        user.role === 'Ads Manager' ? 'bg-blue-100 text-blue-800' :
+                        'bg-green-100 text-green-800'
+                      }`}>
+                        {user.role}
+                      </span>
+                      <p className="text-xs text-gray-500 mt-1">{getRoleDescription(user.role)}</p>
+                    </td>
+                    <td className="p-4 text-right">
+                      <div className="flex justify-end space-x-2">
+                        <Button variant="ghost" size="sm" onClick={() => openEditModal(user)}>
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => confirmDelete(user.id)}
+                          disabled={user.role === 'Admin' && users.filter(u => u.role === 'Admin').length === 1}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {(!users || users.length === 0) && (
+                  <tr>
+                    <td colSpan={4} className="p-8 text-center text-gray-500">
+                      No users found.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
 
       <Modal
         isOpen={isModalOpen}
@@ -382,7 +427,39 @@ export default function Settings() {
             <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
             <Select
               value={formData.role}
-              onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
+              onChange={(e) => {
+                const newRole = e.target.value as UserRole;
+                let newPermissions = { ...formData.permissions };
+                
+                // Auto-update permissions based on role if they haven't been customized
+                if (newRole === 'Admin') {
+                  newPermissions = {
+                    canManageProducts: true,
+                    canManageContent: true,
+                    canManageAds: true,
+                    canManageUsers: true,
+                    canEditSettings: true,
+                  };
+                } else if (newRole === 'Ads Manager') {
+                  newPermissions = {
+                    canManageProducts: true,
+                    canManageContent: true,
+                    canManageAds: true,
+                    canManageUsers: false,
+                    canEditSettings: false,
+                  };
+                } else if (newRole === 'Content Manager') {
+                  newPermissions = {
+                    canManageProducts: false,
+                    canManageContent: true,
+                    canManageAds: false,
+                    canManageUsers: false,
+                    canEditSettings: false,
+                  };
+                }
+                
+                setFormData({ ...formData, role: newRole, permissions: newPermissions });
+              }}
             >
               <option value="Ads Manager">Ads Manager</option>
               <option value="Content Manager">Content Manager</option>
@@ -391,6 +468,72 @@ export default function Settings() {
             <p className="text-xs text-gray-500 mt-2">
               {getRoleDescription(formData.role)}
             </p>
+          </div>
+
+          <div className="pt-2">
+            <label className="block text-sm font-medium text-gray-700 mb-3">Custom Permissions</label>
+            <div className="space-y-3 bg-gray-50 p-4 rounded-lg border border-gray-100">
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  checked={formData.permissions.canManageProducts}
+                  onChange={(e) => setFormData({
+                    ...formData,
+                    permissions: { ...formData.permissions, canManageProducts: e.target.checked }
+                  })}
+                />
+                <span className="text-sm text-gray-700 group-hover:text-gray-900">Manage Products</span>
+              </label>
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  checked={formData.permissions.canManageContent}
+                  onChange={(e) => setFormData({
+                    ...formData,
+                    permissions: { ...formData.permissions, canManageContent: e.target.checked }
+                  })}
+                />
+                <span className="text-sm text-gray-700 group-hover:text-gray-900">Manage Content Plans</span>
+              </label>
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  checked={formData.permissions.canManageAds}
+                  onChange={(e) => setFormData({
+                    ...formData,
+                    permissions: { ...formData.permissions, canManageAds: e.target.checked }
+                  })}
+                />
+                <span className="text-sm text-gray-700 group-hover:text-gray-900">Manage Ads Plans</span>
+              </label>
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  checked={formData.permissions.canManageUsers}
+                  onChange={(e) => setFormData({
+                    ...formData,
+                    permissions: { ...formData.permissions, canManageUsers: e.target.checked }
+                  })}
+                />
+                <span className="text-sm text-gray-700 group-hover:text-gray-900">Manage Users</span>
+              </label>
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  checked={formData.permissions.canEditSettings}
+                  onChange={(e) => setFormData({
+                    ...formData,
+                    permissions: { ...formData.permissions, canEditSettings: e.target.checked }
+                  })}
+                />
+                <span className="text-sm text-gray-700 group-hover:text-gray-900">Edit Company Settings</span>
+              </label>
+            </div>
           </div>
           <div className="mt-6 flex justify-end space-x-3">
             <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>

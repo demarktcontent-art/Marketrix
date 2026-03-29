@@ -5,14 +5,21 @@ import { Card, CardContent } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { LogIn, ShieldAlert, Mail, Lock } from 'lucide-react';
 import { toast } from 'sonner';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 export default function Login() {
-  const { login } = useStore();
+  const { login, currentUser, userProfile, isAuthReady } = useStore();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+
+  React.useEffect(() => {
+    if (isAuthReady && currentUser && userProfile) {
+      navigate('/');
+    }
+  }, [isAuthReady, currentUser, userProfile, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,6 +35,7 @@ export default function Login() {
       const result = await login(email, password);
       if (result.success) {
         toast.success('Welcome back!');
+        navigate('/');
       } else {
         setError(result.error || 'Failed to sign in. Please try again.');
         toast.error('Login Failed');

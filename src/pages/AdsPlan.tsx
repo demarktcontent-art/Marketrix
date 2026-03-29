@@ -23,7 +23,7 @@ export default function AdsPlan() {
   const platforms: AdPlatform[] = ['Facebook', 'TikTok', 'Google'];
   const statuses: AdStatus[] = ['Planning', 'Ready to Live Ad', 'Live Ad'];
 
-  const isEditable = userProfile?.role === 'Admin' || userProfile?.role === 'Ads Manager';
+  const isEditable = userProfile?.permissions?.canManageAds ?? (userProfile?.role === 'Admin' || userProfile?.role === 'Ads Manager');
 
   const toggleProduct = (productId: string) => {
     const newExpanded = new Set(expandedProducts);

@@ -20,8 +20,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { companySettings, userProfile, logout } = useStore();
 
   const filteredNavItems = navItems.filter(item => {
-    if (item.name === 'Content Plan' && userProfile?.role === 'Ads Manager') return false;
-    if (item.name === 'Ads Plan' && userProfile?.role === 'Content Manager') return false;
+    if (item.name === 'Products' && !(userProfile?.permissions?.canManageProducts ?? (userProfile?.role === 'Admin' || userProfile?.role === 'Ads Manager'))) return false;
+    if (item.name === 'Content Plan' && !(userProfile?.permissions?.canManageContent ?? (userProfile?.role === 'Admin' || userProfile?.role === 'Content Manager'))) return false;
+    if (item.name === 'Ads Plan' && !(userProfile?.permissions?.canManageAds ?? (userProfile?.role === 'Admin' || userProfile?.role === 'Ads Manager'))) return false;
+    if (item.name === 'Settings' && !(userProfile?.permissions?.canManageUsers || userProfile?.permissions?.canEditSettings || userProfile?.role === 'Admin')) return false;
     return true;
   });
 

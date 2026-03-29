@@ -63,12 +63,21 @@ export type AdFeedback = {
 
 export type UserRole = 'Admin' | 'Ads Manager' | 'Content Manager';
 
+export type UserPermissions = {
+  canManageProducts: boolean;
+  canManageContent: boolean;
+  canManageAds: boolean;
+  canManageUsers: boolean;
+  canEditSettings: boolean;
+};
+
 export type User = {
   id: string;
   name: string;
   email: string;
   password?: string;
   role: UserRole;
+  permissions: UserPermissions;
   createdAt: string;
 };
 

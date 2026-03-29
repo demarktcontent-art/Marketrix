@@ -23,7 +23,7 @@ export default function ContentPlan() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingPost, setEditingPost] = useState<SocialPost | null>(null);
 
-  const canManageContent = userProfile?.role === 'Admin' || userProfile?.role === 'Content Manager';
+  const canManageContent = userProfile?.permissions?.canManageContent ?? (userProfile?.role === 'Admin' || userProfile?.role === 'Content Manager');
 
   const getProductName = (id: string) => {
     return products.find(p => p.id === id)?.name || 'Unknown Product';

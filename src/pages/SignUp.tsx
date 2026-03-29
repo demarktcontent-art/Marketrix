@@ -8,13 +8,19 @@ import { toast } from 'sonner';
 import { Link, useNavigate } from 'react-router-dom';
 
 export default function SignUp() {
-  const { signUp } = useStore();
+  const { signUp, currentUser, userProfile, isAuthReady } = useStore();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+
+  React.useEffect(() => {
+    if (isAuthReady && currentUser && userProfile) {
+      navigate('/');
+    }
+  }, [isAuthReady, currentUser, userProfile, navigate]);
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
