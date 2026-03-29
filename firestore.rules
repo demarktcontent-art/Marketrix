@@ -35,21 +35,6 @@ service cloud.firestore {
     // Helper Functions
     // ===============================================================
     
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
-    }
-
-    function isAdmin() {
-      return isAuthenticated() && (
-        (request.auth.token.email == "demarkt.content@gmail.com" && request.auth.token.email_verified == true) ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin'
-      );
-    }
-
     function hasRequiredFields(fields) {
       return request.resource.data.keys().hasAll(fields);
     }
@@ -125,68 +110,49 @@ service cloud.firestore {
     // ===============================================================
 
     match /users/{userId} {
-      // Allow reading profiles for login and session management
-      // We allow 'get' for everyone so the app can fetch the profile after login
-      // We allow 'list' for the bootstrap check
-      allow read: if true;
-      
-      // Only Admins can create or delete users
-      // Exception: Allow creation if the database is empty (bootstrap)
-      allow create: if isAdmin() || (request.resource.data.email == "demarkt.content@gmail.com");
-      allow delete: if isAdmin();
-      
-      // Allow updates if Admin OR if a user is updating their own pendingDevices during login
-      allow update: if isAdmin() || (
-        isAuthenticated() && request.auth.uid == userId && 
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pendingDevices'])
-      );
+      // Simple logic: allow all access to users collection
+      allow read, write: if true;
     }
 
     match /products/{productId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && isValidProduct(request.resource.data);
-      allow update: if isAuthenticated() && isValidProduct(request.resource.data);
-      allow delete: if isAdmin();
+      allow read: if true;
+      allow create, update: if isValidProduct(request.resource.data);
+      allow delete: if true;
     }
 
     match /contentItems/{contentId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && isValidContentItem(request.resource.data);
-      allow update: if isAuthenticated() && isValidContentItem(request.resource.data);
-      allow delete: if isAuthenticated();
+      allow read: if true;
+      allow create, update: if isValidContentItem(request.resource.data);
+      allow delete: if true;
     }
 
     match /socialPosts/{postId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && isValidSocialPost(request.resource.data);
-      allow update: if isAuthenticated() && isValidSocialPost(request.resource.data);
-      allow delete: if isAuthenticated();
+      allow read: if true;
+      allow create, update: if isValidSocialPost(request.resource.data);
+      allow delete: if true;
     }
 
     match /adItems/{adId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && isValidAdItem(request.resource.data);
-      allow update: if isAuthenticated() && isValidAdItem(request.resource.data);
-      allow delete: if isAuthenticated();
+      allow read: if true;
+      allow create, update: if isValidAdItem(request.resource.data);
+      allow delete: if true;
     }
 
     match /adFeedbacks/{feedbackId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && isValidAdFeedback(request.resource.data);
-      allow update: if isAuthenticated() && isValidAdFeedback(request.resource.data);
-      allow delete: if isAuthenticated();
+      allow read: if true;
+      allow create, update: if isValidAdFeedback(request.resource.data);
+      allow delete: if true;
     }
 
     match /pastReports/{reportId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && isValidContentReport(request.resource.data);
-      allow update: if isAuthenticated() && isValidContentReport(request.resource.data);
-      allow delete: if isAuthenticated();
+      allow read: if true;
+      allow create, update: if isValidContentReport(request.resource.data);
+      allow delete: if true;
     }
 
     match /settings/company {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin() && isValidCompanySettings(request.resource.data);
+      allow read: if true;
+      allow write: if isValidCompanySettings(request.resource.data);
     }
   }
 }

@@ -15,12 +15,11 @@ import AdsPlan from './pages/AdsPlan';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
 import SignUp from './pages/SignUp';
-import PendingApproval from './pages/PendingApproval';
 import ErrorBoundary from './components/ErrorBoundary';
 import { useStore } from './store';
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { currentUser, userProfile, isAuthReady, isDeviceApproved } = useStore();
+  const { currentUser, userProfile, isAuthReady } = useStore();
 
   if (!isAuthReady) {
     return (
@@ -34,10 +33,6 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" replace />;
   }
 
-  if (!isDeviceApproved) {
-    return <Navigate to="/pending-approval" replace />;
-  }
-
   return <>{children}</>;
 }
 
@@ -48,7 +43,6 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<SignUp />} />
-          <Route path="/pending-approval" element={<PendingApproval />} />
           <Route
             path="/*"
             element={

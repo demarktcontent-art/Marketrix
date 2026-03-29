@@ -17,9 +17,7 @@ export default function Settings() {
     deleteUser, 
     companySettings, 
     updateCompanySettings, 
-    userProfile,
-    approveDevice,
-    rejectDevice
+    userProfile
   } = useStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -132,8 +130,6 @@ export default function Settings() {
     }
   };
 
-  const usersWithPendingDevices = users.filter(u => u.pendingDevices && u.pendingDevices.length > 0);
-
   if (!isAdmin) {
     return (
       <div className="space-y-6">
@@ -201,56 +197,6 @@ export default function Settings() {
           Add User
         </Button>
       </div>
-
-      {/* Device Approvals Section */}
-      {usersWithPendingDevices.length > 0 && (
-        <Card className="border-amber-200 bg-amber-50/30">
-          <CardHeader>
-            <CardTitle className="text-lg font-bold text-amber-800 flex items-center">
-              <Monitor className="w-5 h-5 mr-2" />
-              Pending Device Approvals
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {usersWithPendingDevices.map(user => (
-              <div key={user.id} className="bg-white p-4 rounded-lg border border-amber-100 shadow-sm">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div>
-                    <p className="font-bold text-gray-900">{user.name}</p>
-                    <p className="text-sm text-gray-500">{user.email}</p>
-                    <div className="mt-2 space-y-1">
-                      {user.pendingDevices.map(deviceId => (
-                        <div key={deviceId} className="flex items-center text-xs text-gray-400 bg-gray-50 px-2 py-1 rounded">
-                          <code className="flex-1 truncate mr-2">{deviceId}</code>
-                          <div className="flex gap-1">
-                            <button 
-                              onClick={() => approveDevice(user.id, deviceId)}
-                              className="p-1 text-green-600 hover:bg-green-50 rounded"
-                              title="Approve"
-                            >
-                              <Check className="w-3 h-3" />
-                            </button>
-                            <button 
-                              onClick={() => rejectDevice(user.id, deviceId)}
-                              className="p-1 text-red-600 hover:bg-red-50 rounded"
-                              title="Reject"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="text-xs text-amber-600 font-medium bg-amber-100 px-3 py-1 rounded-full self-start sm:self-center">
-                    {user.pendingDevices.length} Pending Request(s)
-                  </div>
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="p-6 border-b border-gray-200">

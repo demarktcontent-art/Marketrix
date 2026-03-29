@@ -13,32 +13,13 @@ import {
   getDocs,
   limit
 } from 'firebase/firestore';
-import { 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
-  signOut, 
-  onAuthStateChanged 
-} from 'firebase/auth';
-import { initializeApp, deleteApp } from 'firebase/app';
-import { auth, db, handleFirestoreError, OperationType } from './firebase';
-import firebaseConfig from '../firebase-applet-config.json';
+import { db, handleFirestoreError, OperationType } from './firebase';
 import { Product, ContentItem, AdItem, SocialPost, ContentReport, AdFeedback, User, CompanySettings } from './types';
-
-// Device ID utility
-const getDeviceId = () => {
-  let deviceId = localStorage.getItem('marketplan_device_id');
-  if (!deviceId) {
-    deviceId = uuidv4();
-    localStorage.setItem('marketplan_device_id', deviceId);
-  }
-  return deviceId;
-};
 
 interface AppState {
   currentUser: { uid: string; email: string } | null;
   userProfile: User | null;
   isAuthReady: boolean;
-  isDeviceApproved: boolean;
   
   products: Product[];
   contentItems: ContentItem[];
@@ -83,18 +64,15 @@ interface AppState {
   bulkDeleteSocialPost: (ids: string[]) => Promise<void>;
   archiveAndClearSocialPosts: (monthName: string) => Promise<void>;
 
-  addUser: (user: Omit<User, 'id' | 'createdAt' | 'approvedDevices' | 'pendingDevices'>) => Promise<void>;
+  addUser: (user: Omit<User, 'id' | 'createdAt'>) => Promise<void>;
   updateUser: (id: string, user: Partial<User>) => Promise<void>;
   deleteUser: (id: string) => Promise<void>;
-  approveDevice: (userId: string, deviceId: string) => Promise<void>;
-  rejectDevice: (userId: string, deviceId: string) => Promise<void>;
 }
 
 export const useStore = create<AppState>((set, get) => ({
   currentUser: null,
   userProfile: null,
   isAuthReady: false,
-  isDeviceApproved: false,
   
   products: [],
   contentItems: [],
@@ -109,69 +87,38 @@ export const useStore = create<AppState>((set, get) => ({
   
   setAuthReady: (ready) => set({ isAuthReady: ready }),
   setCurrentUser: (user) => set({ currentUser: user }),
-  setUserProfile: (profile) => {
-    if (profile) {
-      const deviceId = getDeviceId();
-      const isApproved = profile.role === 'Admin' || profile.approvedDevices.includes(deviceId);
-      set({ userProfile: profile, isDeviceApproved: isApproved });
-    } else {
-      set({ userProfile: null, isDeviceApproved: false });
-    }
-  },
+  setUserProfile: (profile) => set({ userProfile: profile }),
 
   login: async (email, password) => {
     try {
-      // 1. Try to sign in with Firebase Auth
-      let authUser;
-      try {
-        const userCredential = await signInWithEmailAndPassword(auth, email, password);
-        authUser = userCredential.user;
-      } catch (authError: any) {
-        // 2. If it fails, check if this is the first-time bootstrap
-        const usersRef = collection(db, 'users');
-        const q = query(usersRef, limit(1));
-        const snapshot = await getDocs(q);
-        
-        if (snapshot.empty && email === 'demarkt.content@gmail.com') {
-          // Bootstrap the first admin in Firebase Auth
-          const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-          authUser = userCredential.user;
-          
-          const deviceId = getDeviceId();
-          const userData: User = {
-            id: authUser.uid,
+      const usersRef = collection(db, 'users');
+      const q = query(usersRef, where('email', '==', email), where('password', '==', password), limit(1));
+      const snapshot = await getDocs(q);
+      
+      let userData: User;
+
+      if (snapshot.empty) {
+        // Check if this is the first-time bootstrap
+        const allUsersSnapshot = await getDocs(query(usersRef, limit(1)));
+        if (allUsersSnapshot.empty && email === 'demarkt.content@gmail.com') {
+          const id = uuidv4();
+          userData = {
+            id,
             name: 'Master Admin',
             email,
-            password, // Storing for reference as requested, though not ideal
+            password,
             role: 'Admin',
-            approvedDevices: [deviceId],
-            pendingDevices: [],
             createdAt: new Date().toISOString()
           };
-          await setDoc(doc(db, 'users', authUser.uid), userData);
+          await setDoc(doc(db, 'users', id), userData);
         } else {
           return { success: false, error: 'Invalid email or password' };
         }
+      } else {
+        userData = snapshot.docs[0].data() as User;
       }
 
-      // 3. Fetch user profile from Firestore
-      const userDoc = await getDoc(doc(db, 'users', authUser.uid));
-      if (!userDoc.exists()) {
-        return { success: false, error: 'User profile not found' };
-      }
-
-      const userData = userDoc.data() as User;
-      const deviceId = getDeviceId();
-      
-      // 4. Handle device approval
-      if (userData.role !== 'Admin' && !userData.approvedDevices.includes(deviceId)) {
-        if (!userData.pendingDevices.includes(deviceId)) {
-          const updatedPending = [...(userData.pendingDevices || []), deviceId];
-          await updateDoc(doc(db, 'users', userData.id), { pendingDevices: updatedPending });
-          userData.pendingDevices = updatedPending;
-        }
-      }
-
+      localStorage.setItem('marketplan_user_id', userData.id);
       get().setCurrentUser({ uid: userData.id, email: userData.email });
       get().setUserProfile(userData);
       
@@ -184,42 +131,38 @@ export const useStore = create<AppState>((set, get) => ({
 
   signUp: async (name, email, password) => {
     try {
-      // 1. Create the user in Firebase Auth
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const authUser = userCredential.user;
+      const usersRef = collection(db, 'users');
+      const q = query(usersRef, where('email', '==', email), limit(1));
+      const emailCheck = await getDocs(q);
       
-      // 2. Create the user profile in Firestore
-      const deviceId = getDeviceId();
+      if (!emailCheck.empty) {
+        return { success: false, error: 'This email is already in use' };
+      }
+
+      const id = uuidv4();
       const userData: User = {
-        id: authUser.uid,
+        id,
         name,
         email,
-        password, // Storing for reference as requested, though not ideal
-        role: 'Content Manager', // Default role for self-signups
-        approvedDevices: [], // Needs approval
-        pendingDevices: [deviceId],
+        password,
+        role: 'Admin',
         createdAt: new Date().toISOString()
       };
-      await setDoc(doc(db, 'users', authUser.uid), userData);
+      await setDoc(doc(db, 'users', id), userData);
       
+      localStorage.setItem('marketplan_user_id', id);
       get().setCurrentUser({ uid: userData.id, email: userData.email });
       get().setUserProfile(userData);
       
       return { success: true };
     } catch (error: any) {
       console.error('Signup error:', error);
-      let message = 'An error occurred during signup';
-      if (error.code === 'auth/email-already-in-use') {
-        message = 'This email is already in use';
-      } else if (error.code === 'auth/weak-password') {
-        message = 'Password should be at least 6 characters';
-      }
-      return { success: false, error: message };
+      return { success: false, error: 'An error occurred during signup' };
     }
   },
 
-  logout: async () => {
-    await signOut(auth);
+  logout: () => {
+    localStorage.removeItem('marketplan_user_id');
     get().setCurrentUser(null);
     get().setUserProfile(null);
     set({ isAuthReady: true });
@@ -416,27 +359,13 @@ export const useStore = create<AppState>((set, get) => ({
 
   addUser: async (user) => {
     try {
-      // 1. Create the user in Firebase Auth using a secondary app instance
-      // This prevents the admin from being signed out
-      const secondaryApp = initializeApp(firebaseConfig, `secondary-${uuidv4()}`);
-      const { getAuth: getSecondaryAuth, createUserWithEmailAndPassword: createSecondaryUser } = await import('firebase/auth');
-      const secondaryAuth = getSecondaryAuth(secondaryApp);
-      
-      const userCredential = await createSecondaryUser(secondaryAuth, user.email, user.password);
-      const authUser = userCredential.user;
-      
-      // 2. Create the user profile in Firestore
+      const id = uuidv4();
       const newUser: User = { 
         ...user, 
-        id: authUser.uid, 
-        approvedDevices: [], 
-        pendingDevices: [], 
+        id, 
         createdAt: new Date().toISOString() 
       };
-      await setDoc(doc(db, 'users', authUser.uid), newUser);
-      
-      // 3. Cleanup secondary app
-      await deleteApp(secondaryApp);
+      await setDoc(doc(db, 'users', id), newUser);
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'users');
     }
@@ -455,97 +384,71 @@ export const useStore = create<AppState>((set, get) => ({
       handleFirestoreError(error, OperationType.DELETE, `users/${id}`);
     }
   },
-  approveDevice: async (userId, deviceId) => {
-    try {
-      const user = get().users.find(u => u.id === userId);
-      if (user) {
-        const approvedDevices = [...user.approvedDevices, deviceId];
-        const pendingDevices = user.pendingDevices.filter(id => id !== deviceId);
-        await updateDoc(doc(db, 'users', userId), { approvedDevices, pendingDevices });
-      }
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `users/${userId}/approve`);
-    }
-  },
-  rejectDevice: async (userId, deviceId) => {
-    try {
-      const user = get().users.find(u => u.id === userId);
-      if (user) {
-        const pendingDevices = user.pendingDevices.filter(id => id !== deviceId);
-        await updateDoc(doc(db, 'users', userId), { pendingDevices });
-      }
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `users/${userId}/reject`);
-    }
-  },
 }));
 
 // Initialize session persistence and Firestore sync
 const initStore = async () => {
   const store = useStore.getState();
+  const userId = localStorage.getItem('marketplan_user_id');
   
-  onAuthStateChanged(auth, async (authUser) => {
-    if (authUser) {
-      const userDoc = await getDoc(doc(db, 'users', authUser.uid));
-      if (userDoc.exists()) {
-        const userData = userDoc.data() as User;
-        store.setCurrentUser({ uid: userData.id, email: userData.email });
-        store.setUserProfile(userData);
-        
-        // Set up Firestore listeners
-        const unsubscribes = [
-          onSnapshot(collection(db, 'products'), (snapshot) => {
-            useStore.setState({ products: snapshot.docs.map(doc => doc.data() as Product) });
-          }, (error) => handleFirestoreError(error, OperationType.LIST, 'products')),
+  if (userId) {
+    const userDoc = await getDoc(doc(db, 'users', userId));
+    if (userDoc.exists()) {
+      const userData = userDoc.data() as User;
+      store.setCurrentUser({ uid: userData.id, email: userData.email });
+      store.setUserProfile(userData);
+      
+      // Set up Firestore listeners
+      const unsubscribes = [
+        onSnapshot(collection(db, 'products'), (snapshot) => {
+          useStore.setState({ products: snapshot.docs.map(doc => doc.data() as Product) });
+        }, (error) => handleFirestoreError(error, OperationType.LIST, 'products')),
 
-          onSnapshot(collection(db, 'contentItems'), (snapshot) => {
-            useStore.setState({ contentItems: snapshot.docs.map(doc => doc.data() as ContentItem) });
-          }, (error) => handleFirestoreError(error, OperationType.LIST, 'contentItems')),
+        onSnapshot(collection(db, 'contentItems'), (snapshot) => {
+          useStore.setState({ contentItems: snapshot.docs.map(doc => doc.data() as ContentItem) });
+        }, (error) => handleFirestoreError(error, OperationType.LIST, 'contentItems')),
 
-          onSnapshot(collection(db, 'adItems'), (snapshot) => {
-            useStore.setState({ adItems: snapshot.docs.map(doc => doc.data() as AdItem) });
-          }, (error) => handleFirestoreError(error, OperationType.LIST, 'adItems')),
+        onSnapshot(collection(db, 'adItems'), (snapshot) => {
+          useStore.setState({ adItems: snapshot.docs.map(doc => doc.data() as AdItem) });
+        }, (error) => handleFirestoreError(error, OperationType.LIST, 'adItems')),
 
-          onSnapshot(collection(db, 'socialPosts'), (snapshot) => {
-            useStore.setState({ socialPosts: snapshot.docs.map(doc => doc.data() as SocialPost) });
-          }, (error) => handleFirestoreError(error, OperationType.LIST, 'socialPosts')),
+        onSnapshot(collection(db, 'socialPosts'), (snapshot) => {
+          useStore.setState({ socialPosts: snapshot.docs.map(doc => doc.data() as SocialPost) });
+        }, (error) => handleFirestoreError(error, OperationType.LIST, 'socialPosts')),
 
-          onSnapshot(collection(db, 'pastReports'), (snapshot) => {
-            useStore.setState({ pastReports: snapshot.docs.map(doc => doc.data() as ContentReport) });
-          }, (error) => handleFirestoreError(error, OperationType.LIST, 'pastReports')),
+        onSnapshot(collection(db, 'pastReports'), (snapshot) => {
+          useStore.setState({ pastReports: snapshot.docs.map(doc => doc.data() as ContentReport) });
+        }, (error) => handleFirestoreError(error, OperationType.LIST, 'pastReports')),
 
-          onSnapshot(collection(db, 'adFeedbacks'), (snapshot) => {
-            useStore.setState({ adFeedbacks: snapshot.docs.map(doc => doc.data() as AdFeedback) });
-          }, (error) => handleFirestoreError(error, OperationType.LIST, 'adFeedbacks')),
+        onSnapshot(collection(db, 'adFeedbacks'), (snapshot) => {
+          useStore.setState({ adFeedbacks: snapshot.docs.map(doc => doc.data() as AdFeedback) });
+        }, (error) => handleFirestoreError(error, OperationType.LIST, 'adFeedbacks')),
 
-          onSnapshot(collection(db, 'users'), (snapshot) => {
-            const users = snapshot.docs.map(doc => doc.data() as User);
-            useStore.setState({ users });
-            
-            // Update current user profile if it changed
-            const currentProfile = users.find(u => u.id === authUser.uid);
-            if (currentProfile) {
-              store.setUserProfile(currentProfile);
-            }
-          }, (error) => handleFirestoreError(error, OperationType.LIST, 'users')),
+        onSnapshot(collection(db, 'users'), (snapshot) => {
+          const users = snapshot.docs.map(doc => doc.data() as User);
+          useStore.setState({ users });
+          
+          // Update current user profile if it changed
+          const currentProfile = users.find(u => u.id === userId);
+          if (currentProfile) {
+            store.setUserProfile(currentProfile);
+          }
+        }, (error) => handleFirestoreError(error, OperationType.LIST, 'users')),
 
-          onSnapshot(doc(db, 'settings', 'company'), (doc) => {
-            if (doc.exists()) {
-              useStore.setState({ companySettings: doc.data() as CompanySettings });
-            }
-          }, (error) => handleFirestoreError(error, OperationType.GET, 'settings/company')),
-        ];
-      } else {
-        await signOut(auth);
-        store.setAuthReady(true);
-      }
+        onSnapshot(doc(db, 'settings', 'company'), (doc) => {
+          if (doc.exists()) {
+            useStore.setState({ companySettings: doc.data() as CompanySettings });
+          }
+        }, (error) => handleFirestoreError(error, OperationType.GET, 'settings/company')),
+      ];
     } else {
-      store.setCurrentUser(null);
-      store.setUserProfile(null);
+      localStorage.removeItem('marketplan_user_id');
       store.setAuthReady(true);
     }
+  } else {
     store.setAuthReady(true);
-  });
+  }
+  store.setAuthReady(true);
 };
 
 initStore();

@@ -3,7 +3,6 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Package, FileText, Megaphone, Menu, X, Settings as SettingsIcon, LogOut, User as UserIcon } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useStore } from '../store';
-import { auth } from '../firebase';
 import { toast } from 'sonner';
 
 const navItems = [
@@ -18,7 +17,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { companySettings, userProfile } = useStore();
+  const { companySettings, userProfile, logout } = useStore();
 
   const filteredNavItems = navItems.filter(item => {
     if (item.name === 'Content Plan' && userProfile?.role === 'Ads Manager') return false;
@@ -28,7 +27,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   const handleSignOut = async () => {
     try {
-      await auth.signOut();
+      logout();
       toast.success('Signed out successfully');
       navigate('/login');
     } catch (error) {

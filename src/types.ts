@@ -69,8 +69,6 @@ export type User = {
   email: string;
   password?: string;
   role: UserRole;
-  approvedDevices: string[];
-  pendingDevices: string[];
   createdAt: string;
 };
 
