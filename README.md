@@ -9,9 +9,19 @@ A comprehensive marketing planner for managing products, content, and ads.
 - Dashboard with Analytics
 - Settings for Company & Users
 
-## Deployment on Vercel
+## Deployment
 
-This project is optimized for Vercel deployment.
+### GitHub Pages (Recommended)
+
+This project is configured for automated deployment to GitHub Pages.
+
+1.  **Push to GitHub**: Push this repository to a new GitHub repository.
+2.  **Enable Pages**:
+    -   Go to **Settings** > **Pages** in your GitHub repository.
+    -   Under **Build and deployment** > **Source**, select **GitHub Actions**.
+3.  **Automatic Build**: The included GitHub Action will automatically build and deploy your app whenever you push to the `main` branch.
+
+### Vercel
 
 1.  **Connect to GitHub**: Push this repository to your GitHub account.
 2.  **Import to Vercel**: Go to [Vercel](https://vercel.com) and import the project.
