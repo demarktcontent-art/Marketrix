@@ -14,7 +14,7 @@ import {
   limit
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from './firebase';
-import { Product, ContentItem, AdItem, SocialPost, ContentReport, AdFeedback, User, CompanySettings, UserRole, UserPermissions } from './types';
+import { Product, ContentItem, AdItem, SocialPost, ContentReport, AdFeedback, User, CompanySettings, UserRole, UserPermissions, DeviceApproval } from './types';
 
 const getDefaultPermissions = (role: UserRole): UserPermissions => {
   switch (role) {
@@ -64,6 +64,7 @@ interface AppState {
   socialPosts: SocialPost[];
   pastReports: ContentReport[];
   adFeedbacks: AdFeedback[];
+  deviceApprovals: DeviceApproval[];
   users: User[];
   companySettings: CompanySettings;
   
@@ -71,11 +72,14 @@ interface AppState {
   setCurrentUser: (user: { uid: string; email: string } | null) => void;
   setUserProfile: (profile: User | null) => void;
 
-  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string; pendingApproval?: boolean }>;
   signUp: (name: string, email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
 
   updateCompanySettings: (settings: Partial<CompanySettings>) => Promise<void>;
+
+  approveDevice: (id: string) => Promise<void>;
+  rejectDevice: (id: string) => Promise<void>;
 
   addProduct: (product: Omit<Product, 'id' | 'createdAt'>) => Promise<void>;
   updateProduct: (id: string, product: Partial<Product>) => Promise<void>;
@@ -117,6 +121,7 @@ export const useStore = create<AppState>((set, get) => ({
   socialPosts: [],
   pastReports: [],
   adFeedbacks: [],
+  deviceApprovals: [],
   users: [],
   companySettings: {
     name: 'MarketPlan',
@@ -128,16 +133,33 @@ export const useStore = create<AppState>((set, get) => ({
 
   login: async (email, password) => {
     try {
+      console.log('Attempting login for:', email);
       const usersRef = collection(db, 'users');
       const q = query(usersRef, where('email', '==', email), where('password', '==', password), limit(1));
-      const snapshot = await getDocs(q);
+      
+      let snapshot;
+      try {
+        snapshot = await getDocs(q);
+      } catch (e) {
+        console.error('Error fetching user snapshot:', e);
+        throw e;
+      }
       
       let userData: User;
 
       if (snapshot.empty) {
+        console.log('User not found, checking for bootstrap...');
         // Check if this is the first-time bootstrap
-        const allUsersSnapshot = await getDocs(query(usersRef, limit(1)));
+        let allUsersSnapshot;
+        try {
+          allUsersSnapshot = await getDocs(query(usersRef, limit(1)));
+        } catch (e) {
+          console.error('Error fetching all users snapshot:', e);
+          throw e;
+        }
+
         if (allUsersSnapshot.empty && email === 'demarkt.content@gmail.com') {
+          console.log('Bootstrapping master admin...');
           const id = uuidv4();
           userData = {
             id,
@@ -148,12 +170,53 @@ export const useStore = create<AppState>((set, get) => ({
             permissions: getDefaultPermissions('Admin'),
             createdAt: new Date().toISOString()
           };
-          await setDoc(doc(db, 'users', id), userData);
+          try {
+            await setDoc(doc(db, 'users', id), userData);
+          } catch (e) {
+            console.error('Error setting bootstrap user doc:', e);
+            throw e;
+          }
         } else {
           return { success: false, error: 'Invalid email or password' };
         }
       } else {
         userData = snapshot.docs[0].data() as User;
+      }
+
+      // Device Approval Check
+      if (userData.role !== 'Admin') {
+        let deviceId = localStorage.getItem('marketplan_device_id');
+        if (!deviceId) {
+          deviceId = uuidv4();
+          localStorage.setItem('marketplan_device_id', deviceId);
+        }
+
+        const approvalsRef = collection(db, 'deviceApprovals');
+        const aq = query(approvalsRef, where('userId', '==', userData.id), where('deviceId', '==', deviceId), limit(1));
+        const aSnapshot = await getDocs(aq);
+
+        if (aSnapshot.empty) {
+          // Create new approval request
+          const approvalId = uuidv4();
+          const newApproval: DeviceApproval = {
+            id: approvalId,
+            userId: userData.id,
+            userEmail: userData.email,
+            userName: userData.name,
+            deviceId,
+            deviceName: navigator.userAgent.includes('Mobi') ? 'Mobile Device' : 'Desktop Device',
+            userAgent: navigator.userAgent,
+            isApproved: false,
+            createdAt: new Date().toISOString()
+          };
+          await setDoc(doc(db, 'deviceApprovals', approvalId), newApproval);
+          return { success: false, pendingApproval: true, error: 'Device pending approval from Admin' };
+        } else {
+          const approvalData = aSnapshot.docs[0].data() as DeviceApproval;
+          if (!approvalData.isApproved) {
+            return { success: false, pendingApproval: true, error: 'Device pending approval from Admin' };
+          }
+        }
       }
 
       localStorage.setItem('marketplan_user_id', userData.id);
@@ -163,6 +226,9 @@ export const useStore = create<AppState>((set, get) => ({
       return { success: true };
     } catch (error) {
       console.error('Login error:', error);
+      if (error instanceof Error && error.message.includes('permission')) {
+        handleFirestoreError(error, OperationType.GET, 'users');
+      }
       return { success: false, error: 'An error occurred during login' };
     }
   },
@@ -213,6 +279,22 @@ export const useStore = create<AppState>((set, get) => ({
       await setDoc(doc(db, 'settings', 'company'), newSettings);
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'settings/company');
+    }
+  },
+
+  approveDevice: async (id) => {
+    try {
+      await updateDoc(doc(db, 'deviceApprovals', id), { isApproved: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `deviceApprovals/${id}`);
+    }
+  },
+
+  rejectDevice: async (id) => {
+    try {
+      await deleteDoc(doc(db, 'deviceApprovals', id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `deviceApprovals/${id}`);
     }
   },
 
@@ -463,6 +545,10 @@ const initStore = async () => {
         onSnapshot(collection(db, 'adFeedbacks'), (snapshot) => {
           useStore.setState({ adFeedbacks: snapshot.docs.map(doc => doc.data() as AdFeedback) });
         }, (error) => handleFirestoreError(error, OperationType.LIST, 'adFeedbacks')),
+
+        onSnapshot(collection(db, 'deviceApprovals'), (snapshot) => {
+          useStore.setState({ deviceApprovals: snapshot.docs.map(doc => doc.data() as DeviceApproval) });
+        }, (error) => handleFirestoreError(error, OperationType.LIST, 'deviceApprovals')),
 
         onSnapshot(collection(db, 'users'), (snapshot) => {
           const users = snapshot.docs.map(doc => doc.data() as User);

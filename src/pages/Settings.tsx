@@ -17,8 +17,12 @@ export default function Settings() {
     deleteUser, 
     companySettings, 
     updateCompanySettings, 
-    userProfile
+    userProfile,
+    deviceApprovals,
+    approveDevice,
+    rejectDevice
   } = useStore();
+  const [activeTab, setActiveTab] = useState<'users' | 'devices'>('users');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
@@ -315,70 +319,178 @@ export default function Settings() {
       {canManageUsers && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="p-6 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-              <Shield className="w-5 h-5 mr-2 text-blue-600" />
-              User Access Control
-            </h2>
-            <p className="text-sm text-gray-500 mt-1">
-              Manage who has access to {companySettings.name || 'MarketPlan'} and what they can do.
-            </p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+                  <Shield className="w-5 h-5 mr-2 text-blue-600" />
+                  User Access Control
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Manage who has access to {companySettings.name || 'MarketPlan'} and what they can do.
+                </p>
+              </div>
+              <div className="flex bg-gray-100 p-1 rounded-lg self-start">
+                <button
+                  onClick={() => setActiveTab('users')}
+                  className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${
+                    activeTab === 'users' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  Users
+                </button>
+                <button
+                  onClick={() => setActiveTab('devices')}
+                  className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${
+                    activeTab === 'devices' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  Device Approvals
+                  {deviceApprovals.filter(d => !d.isApproved).length > 0 && (
+                    <span className="ml-2 px-1.5 py-0.5 bg-red-100 text-red-600 text-[10px] rounded-full">
+                      {deviceApprovals.filter(d => !d.isApproved).length}
+                    </span>
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
           
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-gray-50 text-gray-500 text-sm">
-                  <th className="p-4 font-medium border-b border-gray-200">Name</th>
-                  <th className="p-4 font-medium border-b border-gray-200">Email</th>
-                  <th className="p-4 font-medium border-b border-gray-200">Role</th>
-                  <th className="p-4 font-medium border-b border-gray-200 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {users?.map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-50">
-                    <td className="p-4">
-                      <div className="font-medium text-gray-900">{user.name}</div>
-                    </td>
-                    <td className="p-4 text-gray-600">{user.email}</td>
-                    <td className="p-4">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        user.role === 'Admin' ? 'bg-purple-100 text-purple-800' :
-                        user.role === 'Ads Manager' ? 'bg-blue-100 text-blue-800' :
-                        'bg-green-100 text-green-800'
-                      }`}>
-                        {user.role}
-                      </span>
-                      <p className="text-xs text-gray-500 mt-1">{getRoleDescription(user.role)}</p>
-                    </td>
-                    <td className="p-4 text-right">
-                      <div className="flex justify-end space-x-2">
-                        <Button variant="ghost" size="sm" onClick={() => openEditModal(user)}>
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          onClick={() => confirmDelete(user.id)}
-                          disabled={user.role === 'Admin' && users.filter(u => u.role === 'Admin').length === 1}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </td>
+          {activeTab === 'users' ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-gray-50 text-gray-500 text-sm">
+                    <th className="p-4 font-medium border-b border-gray-200">Name</th>
+                    <th className="p-4 font-medium border-b border-gray-200">Email</th>
+                    <th className="p-4 font-medium border-b border-gray-200">Role</th>
+                    <th className="p-4 font-medium border-b border-gray-200 text-right">Actions</th>
                   </tr>
-                ))}
-                {(!users || users.length === 0) && (
-                  <tr>
-                    <td colSpan={4} className="p-8 text-center text-gray-500">
-                      No users found.
-                    </td>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {users?.map((user) => (
+                    <tr key={user.id} className="hover:bg-gray-50">
+                      <td className="p-4">
+                        <div className="font-medium text-gray-900">{user.name}</div>
+                      </td>
+                      <td className="p-4 text-gray-600">{user.email}</td>
+                      <td className="p-4">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          user.role === 'Admin' ? 'bg-purple-100 text-purple-800' :
+                          user.role === 'Ads Manager' ? 'bg-blue-100 text-blue-800' :
+                          'bg-green-100 text-green-800'
+                        }`}>
+                          {user.role}
+                        </span>
+                        <p className="text-xs text-gray-500 mt-1">{getRoleDescription(user.role)}</p>
+                      </td>
+                      <td className="p-4 text-right">
+                        <div className="flex justify-end space-x-2">
+                          <Button variant="ghost" size="sm" onClick={() => openEditModal(user)}>
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => confirmDelete(user.id)}
+                            disabled={user.role === 'Admin' && users.filter(u => u.role === 'Admin').length === 1}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {(!users || users.length === 0) && (
+                    <tr>
+                      <td colSpan={4} className="p-8 text-center text-gray-500">
+                        No users found.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-gray-50 text-gray-500 text-sm">
+                    <th className="p-4 font-medium border-b border-gray-200">User</th>
+                    <th className="p-4 font-medium border-b border-gray-200">Device</th>
+                    <th className="p-4 font-medium border-b border-gray-200">Status</th>
+                    <th className="p-4 font-medium border-b border-gray-200 text-right">Actions</th>
                   </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {deviceApprovals?.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((approval) => (
+                    <tr key={approval.id} className="hover:bg-gray-50">
+                      <td className="p-4">
+                        <div className="font-medium text-gray-900">{approval.userName}</div>
+                        <div className="text-xs text-gray-500">{approval.userEmail}</div>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex items-center gap-2">
+                          <Monitor className="w-4 h-4 text-gray-400" />
+                          <span className="text-sm text-gray-700">{approval.deviceName}</span>
+                        </div>
+                        <div className="text-[10px] text-gray-400 mt-1 truncate max-w-[200px]" title={approval.userAgent}>
+                          {approval.userAgent}
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          approval.isApproved ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {approval.isApproved ? 'Approved' : 'Pending'}
+                        </span>
+                        <div className="text-[10px] text-gray-400 mt-1">
+                          {new Date(approval.createdAt).toLocaleDateString()}
+                        </div>
+                      </td>
+                      <td className="p-4 text-right">
+                        <div className="flex justify-end space-x-2">
+                          {!approval.isApproved && (
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200"
+                              onClick={() => {
+                                approveDevice(approval.id);
+                                toast.success('Device approved');
+                              }}
+                            >
+                              <Check className="w-4 h-4 mr-1" />
+                              Approve
+                            </Button>
+                          )}
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => {
+                              rejectDevice(approval.id);
+                              toast.success('Device request removed');
+                            }}
+                          >
+                            <X className="w-4 h-4 mr-1" />
+                            {approval.isApproved ? 'Remove' : 'Reject'}
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {(!deviceApprovals || deviceApprovals.length === 0) && (
+                    <tr>
+                      <td colSpan={4} className="p-8 text-center text-gray-500">
+                        No device approval requests found.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 

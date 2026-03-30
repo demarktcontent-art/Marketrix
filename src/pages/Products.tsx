@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Edit, Trash2 } from 'lucide-react';
+import { Plus, Edit, Trash2, Loader2, Sparkles } from 'lucide-react';
 import { useStore } from '../store';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { Product } from '../types';
+import { extractProductInfo } from '../services/geminiService';
+import { toast } from 'sonner';
 
 export default function Products() {
   const { products, addProduct, updateProduct, deleteProduct, userProfile } = useStore();
@@ -13,8 +15,16 @@ export default function Products() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState<string | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [isFetching, setIsFetching] = useState(false);
 
-  const canManageProducts = userProfile?.permissions?.canManageProducts ?? (userProfile?.role === 'Admin' || userProfile?.role === 'Ads Manager');
+  const isAdmin = userProfile?.role === 'Admin';
+  const isAdsManager = userProfile?.role === 'Ads Manager';
+  const isContentManager = userProfile?.role === 'Content Manager';
+
+  const canSeeBuyingPrice = isAdmin || isAdsManager;
+  const canSetBuyingPrice = isAdmin;
+  const canEditDeleteProduct = isAdmin || isAdsManager;
+  const canAddProduct = true; // Anyone can add product
 
   const [formData, setFormData] = useState({
     name: '',
@@ -63,6 +73,29 @@ export default function Products() {
     setIsDeleteModalOpen(true);
   };
 
+  const handleFetchInfo = async () => {
+    if (!formData.websiteLink) {
+      toast.error('Please enter a website link first');
+      return;
+    }
+
+    setIsFetching(true);
+    try {
+      const info = await extractProductInfo(formData.websiteLink);
+      setFormData(prev => ({
+        ...prev,
+        name: info.name || prev.name,
+        sellingPrice: info.price ? info.price.toString() : prev.sellingPrice,
+      }));
+      toast.success('Product info fetched successfully!');
+    } catch (error) {
+      console.error('Fetch error:', error);
+      toast.error('Failed to fetch product info. Please enter manually.');
+    } finally {
+      setIsFetching(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (productToDelete) {
       try {
@@ -79,7 +112,7 @@ export default function Products() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-gray-900">Products</h2>
-        {canManageProducts && (
+        {canAddProduct && (
           <Button onClick={() => {
             setEditingProduct(null);
             setFormData({ name: '', buyingPrice: '', sellingPrice: '', websiteLink: '' });
@@ -96,9 +129,16 @@ export default function Products() {
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Buying Price</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Selling Price</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Margin</th>
+              {canSeeBuyingPrice && (
+                <>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Buying Price</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Selling Price</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Margin</th>
+                </>
+              )}
+              {!canSeeBuyingPrice && (
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Selling Price</th>
+              )}
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Website</th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
             </tr>
@@ -111,11 +151,17 @@ export default function Products() {
                     {product.name}
                   </Link>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-gray-500">${product.buyingPrice.toFixed(2)}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-gray-500">${product.sellingPrice.toFixed(2)}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-green-600 font-medium">
-                  ${(product.sellingPrice - product.buyingPrice).toFixed(2)}
-                </td>
+                {canSeeBuyingPrice ? (
+                  <>
+                    <td className="px-6 py-4 whitespace-nowrap text-gray-500">${product.buyingPrice.toFixed(2)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-gray-500">${product.sellingPrice.toFixed(2)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-green-600 font-medium">
+                      ${(product.sellingPrice - product.buyingPrice).toFixed(2)}
+                    </td>
+                  </>
+                ) : (
+                  <td className="px-6 py-4 whitespace-nowrap text-gray-500">${product.sellingPrice.toFixed(2)}</td>
+                )}
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   {product.websiteLink ? (
                     <a href={product.websiteLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
@@ -124,16 +170,18 @@ export default function Products() {
                   ) : '-'}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  {canManageProducts && (
-                    <div className="flex justify-end space-x-2">
-                      <button onClick={() => openEditModal(product)} className="text-gray-400 hover:text-blue-600">
-                        <Edit className="h-4 w-4" />
-                      </button>
-                      <button onClick={() => confirmDelete(product.id)} className="text-gray-400 hover:text-red-600">
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  )}
+                  <div className="flex justify-end space-x-2">
+                    {canEditDeleteProduct && (
+                      <>
+                        <button onClick={() => openEditModal(product)} className="text-gray-400 hover:text-blue-600">
+                          <Edit className="h-4 w-4" />
+                        </button>
+                        <button onClick={() => confirmDelete(product.id)} className="text-gray-400 hover:text-red-600">
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -164,18 +212,24 @@ export default function Products() {
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Buying Price ($)</label>
-              <Input
-                required
-                type="number"
-                step="0.01"
-                min="0"
-                value={formData.buyingPrice}
-                onChange={(e) => setFormData({ ...formData, buyingPrice: e.target.value })}
-              />
-            </div>
-            <div>
+            {canSetBuyingPrice ? (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Buying Price ($)</label>
+                <Input
+                  required
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.buyingPrice}
+                  onChange={(e) => setFormData({ ...formData, buyingPrice: e.target.value })}
+                />
+              </div>
+            ) : (
+              <div className="hidden">
+                <Input type="hidden" value={formData.buyingPrice} />
+              </div>
+            )}
+            <div className={canSetBuyingPrice ? "" : "col-span-2"}>
               <label className="block text-sm font-medium text-gray-700 mb-1">Selling Price ($)</label>
               <Input
                 required
@@ -189,12 +243,29 @@ export default function Products() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Product Website Link</label>
-            <Input
-              type="url"
-              value={formData.websiteLink}
-              onChange={(e) => setFormData({ ...formData, websiteLink: e.target.value })}
-              placeholder="https://example.com/product"
-            />
+            <div className="flex gap-2">
+              <Input
+                type="url"
+                className="flex-1"
+                value={formData.websiteLink}
+                onChange={(e) => setFormData({ ...formData, websiteLink: e.target.value })}
+                placeholder="https://example.com/product"
+              />
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={handleFetchInfo}
+                disabled={isFetching || !formData.websiteLink}
+                className="shrink-0"
+              >
+                {isFetching ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4 mr-2" />
+                )}
+                {isFetching ? 'Fetching...' : 'Fetch Info'}
+              </Button>
+            </div>
           </div>
           <div className="mt-6 flex justify-end space-x-3">
             <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>

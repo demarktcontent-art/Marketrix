@@ -112,12 +112,33 @@
         "logoUrl": { "type": "string" }
       },
       "required": ["name"]
+    },
+    "DeviceApproval": {
+      "title": "DeviceApproval",
+      "description": "A request for device approval.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "userName": { "type": "string" },
+        "deviceId": { "type": "string" },
+        "deviceName": { "type": "string" },
+        "userAgent": { "type": "string" },
+        "isApproved": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "userEmail", "userName", "deviceId", "deviceName", "userAgent", "isApproved", "createdAt"]
     }
   },
   "firestore": {
     "/users/{userId}": {
       "schema": "User",
       "description": "User profiles."
+    },
+    "/deviceApprovals/{approvalId}": {
+      "schema": "DeviceApproval",
+      "description": "Device approval requests."
     },
     "/products/{productId}": {
       "schema": "Product",

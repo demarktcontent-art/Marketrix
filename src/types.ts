@@ -81,6 +81,18 @@ export type User = {
   createdAt: string;
 };
 
+export type DeviceApproval = {
+  id: string;
+  userId: string;
+  userEmail: string;
+  userName: string;
+  deviceId: string;
+  deviceName: string;
+  userAgent: string;
+  isApproved: boolean;
+  createdAt: string;
+};
+
 export type CompanySettings = {
   name: string;
   logoUrl?: string;

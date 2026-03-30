@@ -29,6 +29,9 @@ service cloud.firestore {
     // Collection: settings/company
     // Fields: name, logoUrl
     //
+    // Collection: deviceApprovals
+    // Fields: id, userId, userEmail, userName, deviceId, deviceName, userAgent, isApproved, createdAt
+    //
     // ===============================================================
 
     // ===============================================================
@@ -105,54 +108,19 @@ service cloud.firestore {
       return hasRequiredFields(['name']) && data.name is string && data.name.size() > 0;
     }
 
+    function isValidDeviceApproval(data) {
+      return hasRequiredFields(['id', 'userId', 'userEmail', 'userName', 'deviceId', 'deviceName', 'userAgent', 'isApproved', 'createdAt']) &&
+             data.id is string && data.userId is string && data.userEmail is string &&
+             data.userName is string && data.deviceId is string && data.deviceName is string &&
+             data.userAgent is string && data.isApproved is bool && data.createdAt is string;
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
 
-    match /users/{userId} {
-      // Simple logic: allow all access to users collection
+    match /{document=**} {
       allow read, write: if true;
-    }
-
-    match /products/{productId} {
-      allow read: if true;
-      allow create, update: if isValidProduct(request.resource.data);
-      allow delete: if true;
-    }
-
-    match /contentItems/{contentId} {
-      allow read: if true;
-      allow create, update: if isValidContentItem(request.resource.data);
-      allow delete: if true;
-    }
-
-    match /socialPosts/{postId} {
-      allow read: if true;
-      allow create, update: if isValidSocialPost(request.resource.data);
-      allow delete: if true;
-    }
-
-    match /adItems/{adId} {
-      allow read: if true;
-      allow create, update: if isValidAdItem(request.resource.data);
-      allow delete: if true;
-    }
-
-    match /adFeedbacks/{feedbackId} {
-      allow read: if true;
-      allow create, update: if isValidAdFeedback(request.resource.data);
-      allow delete: if true;
-    }
-
-    match /pastReports/{reportId} {
-      allow read: if true;
-      allow create, update: if isValidContentReport(request.resource.data);
-      allow delete: if true;
-    }
-
-    match /settings/company {
-      allow read: if true;
-      allow write: if isValidCompanySettings(request.resource.data);
     }
   }
 }

@@ -36,6 +36,9 @@ export default function Login() {
       if (result.success) {
         toast.success('Welcome back!');
         navigate('/');
+      } else if (result.pendingApproval) {
+        setError('Your device is pending approval from an administrator. Please wait for approval before logging in.');
+        toast.info('Device Pending Approval');
       } else {
         setError(result.error || 'Failed to sign in. Please try again.');
         toast.error('Login Failed');

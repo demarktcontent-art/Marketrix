@@ -22,8 +22,11 @@ export default function ProductDetail() {
   const productContent = contentItems.filter(c => c.productId === id);
   const productAds = adItems.filter(a => a.productId === id);
 
-  const isContentManager = userProfile?.role === 'Admin' || userProfile?.role === 'Content Manager';
-  const isAdsManager = userProfile?.role === 'Admin' || userProfile?.role === 'Ads Manager';
+  const isAdmin = userProfile?.role === 'Admin';
+  const isAdsManager = userProfile?.role === 'Ads Manager';
+  const isContentManager = userProfile?.role === 'Content Manager';
+
+  const canSeeBuyingPrice = isAdmin || isAdsManager;
 
   const [contentForm, setContentForm] = useState({
     title: '',
@@ -100,15 +103,17 @@ export default function ProductDetail() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">Buying Price</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${product.buyingPrice.toFixed(2)}</div>
-          </CardContent>
-        </Card>
-        <Card>
+        {canSeeBuyingPrice && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-500">Buying Price</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">${product.buyingPrice.toFixed(2)}</div>
+            </CardContent>
+          </Card>
+        )}
+        <Card className={canSeeBuyingPrice ? "" : "md:col-span-3"}>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-gray-500">Selling Price</CardTitle>
           </CardHeader>
@@ -116,16 +121,18 @@ export default function ProductDetail() {
             <div className="text-2xl font-bold">${product.sellingPrice.toFixed(2)}</div>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">Profit Margin</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              ${(product.sellingPrice - product.buyingPrice).toFixed(2)}
-            </div>
-          </CardContent>
-        </Card>
+        {canSeeBuyingPrice && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-500">Profit Margin</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">
+                ${(product.sellingPrice - product.buyingPrice).toFixed(2)}
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
