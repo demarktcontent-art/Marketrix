@@ -69,6 +69,14 @@ export type UserPermissions = {
   canManageAds: boolean;
   canManageUsers: boolean;
   canEditSettings: boolean;
+  canSeeBuyingPrice: boolean;
+};
+
+export type Role = {
+  id: string;
+  name: string;
+  permissions: UserPermissions;
+  createdAt: string;
 };
 
 export type User = {
@@ -76,7 +84,8 @@ export type User = {
   name: string;
   email: string;
   password?: string;
-  role: UserRole;
+  role: string; // Dynamic role name
+  roleId?: string; // Reference to Role entity
   permissions: UserPermissions;
   createdAt: string;
 };

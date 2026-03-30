@@ -6,7 +6,10 @@ service cloud.firestore {
     // ===============================================================
     //
     // Collection: users
-    // Fields: id, name, email, password, role, approvedDevices, pendingDevices, createdAt
+    // Fields: id, name, email, password, role, roleId, permissions, approvedDevices, pendingDevices, createdAt
+    //
+    // Collection: roles
+    // Fields: id, name, permissions, createdAt
     //
     // Collection: products
     // Fields: id, name, buyingPrice, sellingPrice, websiteLink, createdAt
@@ -38,6 +41,28 @@ service cloud.firestore {
     // Helper Functions
     // ===============================================================
     
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (getUserData().role == 'Admin' || 
+         (request.auth.token.email == "demarkt.content@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function hasPermission(permission) {
+      return isAuthenticated() && (isAdmin() || getUserData().permissions[permission] == true);
+    }
+
     function hasRequiredFields(fields) {
       return request.resource.data.keys().hasAll(fields);
     }
@@ -55,10 +80,18 @@ service cloud.firestore {
     // ===============================================================
 
     function isValidUser(data) {
-      return hasRequiredFields(['id', 'name', 'email', 'role', 'createdAt']) &&
+      return hasRequiredFields(['id', 'name', 'email', 'role', 'permissions', 'createdAt']) &&
              data.id is string && data.name is string && data.name.size() > 0 &&
              isValidEmail(data.email) &&
-             data.role in ['Admin', 'Ads Manager', 'Content Manager'] &&
+             data.role is string &&
+             data.permissions is map &&
+             data.createdAt is string;
+    }
+
+    function isValidRole(data) {
+      return hasRequiredFields(['id', 'name', 'permissions', 'createdAt']) &&
+             data.id is string && data.name is string && data.name.size() > 0 &&
+             data.permissions is map &&
              data.createdAt is string;
     }
 
@@ -119,8 +152,69 @@ service cloud.firestore {
     // Rules
     // ===============================================================
 
-    match /{document=**} {
-      allow read, write: if true;
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if (isAuthenticated() && isValidUser(request.resource.data) && (isAdmin() || isOwner(userId))) || 
+                      (!exists(/databases/$(database)/documents/users/$(userId)) && isValidUser(request.resource.data)); // Allow first signup
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) && (isAdmin() || isOwner(userId));
+      allow delete: if isAdmin();
+    }
+
+    match /roles/{roleId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /products/{productId} {
+      allow read: if isAuthenticated();
+      allow create: if hasPermission('canManageProducts') && isValidProduct(request.resource.data);
+      allow update: if hasPermission('canManageProducts') && isValidProduct(request.resource.data);
+      allow delete: if hasPermission('canManageProducts');
+    }
+
+    match /contentItems/{contentId} {
+      allow read: if isAuthenticated();
+      allow create: if hasPermission('canManageContent') && isValidContentItem(request.resource.data);
+      allow update: if hasPermission('canManageContent') && isValidContentItem(request.resource.data);
+      allow delete: if hasPermission('canManageContent');
+    }
+
+    match /socialPosts/{postId} {
+      allow read: if isAuthenticated();
+      allow create: if hasPermission('canManageContent') && isValidSocialPost(request.resource.data);
+      allow update: if hasPermission('canManageContent') && isValidSocialPost(request.resource.data);
+      allow delete: if hasPermission('canManageContent');
+    }
+
+    match /adItems/{adId} {
+      allow read: if isAuthenticated();
+      allow create: if hasPermission('canManageAds') && isValidAdItem(request.resource.data);
+      allow update: if hasPermission('canManageAds') && isValidAdItem(request.resource.data);
+      allow delete: if hasPermission('canManageAds');
+    }
+
+    match /adFeedbacks/{feedbackId} {
+      allow read: if isAuthenticated();
+      allow create: if hasPermission('canManageAds') && isValidAdFeedback(request.resource.data);
+      allow update: if hasPermission('canManageAds') && isValidAdFeedback(request.resource.data);
+      allow delete: if hasPermission('canManageAds');
+    }
+
+    match /pastReports/{reportId} {
+      allow read: if isAuthenticated();
+      allow write: if hasPermission('canManageContent') && isValidContentReport(request.resource.data);
+    }
+
+    match /settings/company {
+      allow read: if isAuthenticated();
+      allow write: if hasPermission('canEditSettings') && isValidCompanySettings(request.resource.data);
+    }
+
+    match /deviceApprovals/{approvalId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidDeviceApproval(request.resource.data);
+      allow update: if isAdmin() && isValidDeviceApproval(request.resource.data);
+      allow delete: if isAdmin();
     }
   }
 }

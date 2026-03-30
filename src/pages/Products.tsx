@@ -17,14 +17,10 @@ export default function Products() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isFetching, setIsFetching] = useState(false);
 
-  const isAdmin = userProfile?.role === 'Admin';
-  const isAdsManager = userProfile?.role === 'Ads Manager';
-  const isContentManager = userProfile?.role === 'Content Manager';
-
-  const canSeeBuyingPrice = isAdmin || isAdsManager;
-  const canSetBuyingPrice = isAdmin;
-  const canEditDeleteProduct = isAdmin || isAdsManager;
-  const canAddProduct = true; // Anyone can add product
+  const canSeeBuyingPrice = userProfile?.permissions?.canSeeBuyingPrice ?? (userProfile?.role === 'Admin' || userProfile?.role === 'Ads Manager');
+  const canSetBuyingPrice = userProfile?.permissions?.canManageProducts ?? (userProfile?.role === 'Admin');
+  const canEditDeleteProduct = userProfile?.permissions?.canManageProducts ?? (userProfile?.role === 'Admin' || userProfile?.role === 'Ads Manager');
+  const canAddProduct = userProfile?.permissions?.canManageProducts ?? true; // Default to true if not specified, but respect permission
 
   const [formData, setFormData] = useState({
     name: '',
@@ -111,7 +107,7 @@ export default function Products() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">Products</h2>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Products</h2>
         {canAddProduct && (
           <Button onClick={() => {
             setEditingProduct(null);
@@ -124,47 +120,47 @@ export default function Products() {
         )}
       </div>
 
-      <div className="bg-white shadow-sm rounded-lg border border-gray-200 overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <div className="bg-white dark:bg-gray-900 shadow-sm rounded-lg border border-gray-200 dark:border-gray-800 overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
+          <thead className="bg-gray-50 dark:bg-gray-950/50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Name</th>
               {canSeeBuyingPrice && (
                 <>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Buying Price</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Selling Price</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Margin</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Buying Price</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Selling Price</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Margin</th>
                 </>
               )}
               {!canSeeBuyingPrice && (
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Selling Price</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Selling Price</th>
               )}
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Website</th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Website</th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
             {products.map((product) => (
-              <tr key={product.id} className="hover:bg-gray-50">
+              <tr key={product.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <Link to={`/products/${product.id}`} className="text-blue-600 hover:text-blue-900 font-medium">
+                  <Link to={`/products/${product.id}`} className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 font-medium">
                     {product.name}
                   </Link>
                 </td>
                 {canSeeBuyingPrice ? (
                   <>
-                    <td className="px-6 py-4 whitespace-nowrap text-gray-500">${product.buyingPrice.toFixed(2)}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-gray-500">${product.sellingPrice.toFixed(2)}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-green-600 font-medium">
+                    <td className="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">${product.buyingPrice.toFixed(2)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">${product.sellingPrice.toFixed(2)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-green-600 dark:text-green-400 font-medium">
                       ${(product.sellingPrice - product.buyingPrice).toFixed(2)}
                     </td>
                   </>
                 ) : (
-                  <td className="px-6 py-4 whitespace-nowrap text-gray-500">${product.sellingPrice.toFixed(2)}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">${product.sellingPrice.toFixed(2)}</td>
                 )}
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                   {product.websiteLink ? (
-                    <a href={product.websiteLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                    <a href={product.websiteLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
                       Link
                     </a>
                   ) : '-'}
@@ -173,10 +169,10 @@ export default function Products() {
                   <div className="flex justify-end space-x-2">
                     {canEditDeleteProduct && (
                       <>
-                        <button onClick={() => openEditModal(product)} className="text-gray-400 hover:text-blue-600">
+                        <button onClick={() => openEditModal(product)} className="text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400">
                           <Edit className="h-4 w-4" />
                         </button>
-                        <button onClick={() => confirmDelete(product.id)} className="text-gray-400 hover:text-red-600">
+                        <button onClick={() => confirmDelete(product.id)} className="text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400">
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </>
@@ -187,7 +183,7 @@ export default function Products() {
             ))}
             {products.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                <td colSpan={6} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                   No products found. Add one to get started.
                 </td>
               </tr>
@@ -203,7 +199,7 @@ export default function Products() {
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Product Name</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Product Name</label>
             <Input
               required
               value={formData.name}
@@ -214,7 +210,7 @@ export default function Products() {
           <div className="grid grid-cols-2 gap-4">
             {canSetBuyingPrice ? (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Buying Price ($)</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Buying Price ($)</label>
                 <Input
                   required
                   type="number"
@@ -230,7 +226,7 @@ export default function Products() {
               </div>
             )}
             <div className={canSetBuyingPrice ? "" : "col-span-2"}>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Selling Price ($)</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Selling Price ($)</label>
               <Input
                 required
                 type="number"
@@ -242,7 +238,7 @@ export default function Products() {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Product Website Link</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Product Website Link</label>
             <div className="flex gap-2">
               <Input
                 type="url"
@@ -284,7 +280,7 @@ export default function Products() {
         title="Confirm Deletion"
       >
         <div className="space-y-4">
-          <p className="text-gray-600">
+          <p className="text-gray-600 dark:text-gray-400">
             Are you sure you want to delete this product? All associated data will be removed. This action cannot be undone.
           </p>
           <div className="flex justify-end space-x-3">

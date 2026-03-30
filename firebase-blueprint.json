@@ -9,12 +9,46 @@
         "name": { "type": "string" },
         "email": { "type": "string", "format": "email" },
         "password": { "type": "string" },
-        "role": { "type": "string", "enum": ["Admin", "Ads Manager", "Content Manager"] },
+        "role": { "type": "string" },
+        "roleId": { "type": "string" },
+        "permissions": {
+          "type": "object",
+          "properties": {
+            "canManageProducts": { "type": "boolean" },
+            "canManageContent": { "type": "boolean" },
+            "canManageAds": { "type": "boolean" },
+            "canManageUsers": { "type": "boolean" },
+            "canEditSettings": { "type": "boolean" },
+            "canSeeBuyingPrice": { "type": "boolean" }
+          }
+        },
         "approvedDevices": { "type": "array", "items": { "type": "string" } },
         "pendingDevices": { "type": "array", "items": { "type": "string" } },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["id", "name", "email", "role", "createdAt"]
+      "required": ["id", "name", "email", "role", "permissions", "createdAt"]
+    },
+    "Role": {
+      "title": "Role",
+      "description": "Custom role definition with permissions.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "permissions": {
+          "type": "object",
+          "properties": {
+            "canManageProducts": { "type": "boolean" },
+            "canManageContent": { "type": "boolean" },
+            "canManageAds": { "type": "boolean" },
+            "canManageUsers": { "type": "boolean" },
+            "canEditSettings": { "type": "boolean" },
+            "canSeeBuyingPrice": { "type": "boolean" }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "permissions", "createdAt"]
     },
     "Product": {
       "title": "Product",
@@ -135,6 +169,10 @@
     "/users/{userId}": {
       "schema": "User",
       "description": "User profiles."
+    },
+    "/roles/{roleId}": {
+      "schema": "Role",
+      "description": "Custom roles."
     },
     "/deviceApprovals/{approvalId}": {
       "schema": "DeviceApproval",

@@ -14,9 +14,9 @@ import {
   limit
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from './firebase';
-import { Product, ContentItem, AdItem, SocialPost, ContentReport, AdFeedback, User, CompanySettings, UserRole, UserPermissions, DeviceApproval } from './types';
+import { Product, ContentItem, AdItem, SocialPost, ContentReport, AdFeedback, User, CompanySettings, UserRole, UserPermissions, DeviceApproval, Role } from './types';
 
-const getDefaultPermissions = (role: UserRole): UserPermissions => {
+const getDefaultPermissions = (role: string): UserPermissions => {
   switch (role) {
     case 'Admin':
       return {
@@ -25,6 +25,7 @@ const getDefaultPermissions = (role: UserRole): UserPermissions => {
         canManageAds: true,
         canManageUsers: true,
         canEditSettings: true,
+        canSeeBuyingPrice: true,
       };
     case 'Ads Manager':
       return {
@@ -33,6 +34,7 @@ const getDefaultPermissions = (role: UserRole): UserPermissions => {
         canManageAds: true,
         canManageUsers: false,
         canEditSettings: false,
+        canSeeBuyingPrice: false,
       };
     case 'Content Manager':
       return {
@@ -41,6 +43,7 @@ const getDefaultPermissions = (role: UserRole): UserPermissions => {
         canManageAds: false,
         canManageUsers: false,
         canEditSettings: false,
+        canSeeBuyingPrice: false,
       };
     default:
       return {
@@ -49,6 +52,7 @@ const getDefaultPermissions = (role: UserRole): UserPermissions => {
         canManageAds: false,
         canManageUsers: false,
         canEditSettings: false,
+        canSeeBuyingPrice: false,
       };
   }
 };
@@ -66,6 +70,7 @@ interface AppState {
   adFeedbacks: AdFeedback[];
   deviceApprovals: DeviceApproval[];
   users: User[];
+  roles: Role[];
   companySettings: CompanySettings;
   
   setAuthReady: (ready: boolean) => void;
@@ -108,6 +113,10 @@ interface AppState {
   addUser: (user: Omit<User, 'id' | 'createdAt'>) => Promise<void>;
   updateUser: (id: string, user: Partial<User>) => Promise<void>;
   deleteUser: (id: string) => Promise<void>;
+
+  addRole: (role: Omit<Role, 'id' | 'createdAt'>) => Promise<void>;
+  updateRole: (id: string, role: Partial<Role>) => Promise<void>;
+  deleteRole: (id: string) => Promise<void>;
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -123,6 +132,7 @@ export const useStore = create<AppState>((set, get) => ({
   adFeedbacks: [],
   deviceApprovals: [],
   users: [],
+  roles: [],
   companySettings: {
     name: 'MarketPlan',
   },
@@ -506,6 +516,30 @@ export const useStore = create<AppState>((set, get) => ({
       handleFirestoreError(error, OperationType.DELETE, `users/${id}`);
     }
   },
+
+  addRole: async (role) => {
+    try {
+      const id = uuidv4();
+      const newRole: Role = { ...role, id, createdAt: new Date().toISOString() };
+      await setDoc(doc(db, 'roles', id), newRole);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'roles');
+    }
+  },
+  updateRole: async (id, updatedRole) => {
+    try {
+      await updateDoc(doc(db, 'roles', id), updatedRole);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `roles/${id}`);
+    }
+  },
+  deleteRole: async (id) => {
+    try {
+      await deleteDoc(doc(db, 'roles', id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `roles/${id}`);
+    }
+  },
 }));
 
 // Initialize session persistence and Firestore sync
@@ -549,6 +583,10 @@ const initStore = async () => {
         onSnapshot(collection(db, 'deviceApprovals'), (snapshot) => {
           useStore.setState({ deviceApprovals: snapshot.docs.map(doc => doc.data() as DeviceApproval) });
         }, (error) => handleFirestoreError(error, OperationType.LIST, 'deviceApprovals')),
+
+        onSnapshot(collection(db, 'roles'), (snapshot) => {
+          useStore.setState({ roles: snapshot.docs.map(doc => doc.data() as Role) });
+        }, (error) => handleFirestoreError(error, OperationType.LIST, 'roles')),
 
         onSnapshot(collection(db, 'users'), (snapshot) => {
           const users = snapshot.docs.map(doc => doc.data() as User);
