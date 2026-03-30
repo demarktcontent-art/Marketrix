@@ -1,0 +1,126 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Fields: id, name, email, password, role, approvedDevices, pendingDevices, createdAt
+    //
+    // Collection: products
+    // Fields: id, name, buyingPrice, sellingPrice, websiteLink, createdAt
+    //
+    // Collection: contentItems
+    // Fields: id, productId, title, type, status, scheduledDate, description, createdAt
+    //
+    // Collection: socialPosts
+    // Fields: id, date, type, themeProduct, visualDescription, copyCaption, isDone, createdAt
+    //
+    // Collection: adItems
+    // Fields: id, productId, platform, status, mediaLinks, createdAt
+    //
+    // Collection: adFeedbacks
+    // Fields: id, productId, text, isDone, createdAt
+    //
+    // Collection: pastReports
+    // Fields: id, monthName, totalPosts, completedPosts, completionRate, archivedAt
+    //
+    // Collection: settings/company
+    // Fields: name, logoUrl
+    //
+    // Collection: deviceApprovals
+    // Fields: id, userId, userEmail, userName, deviceId, deviceName, userAgent, isApproved, createdAt
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasRequiredFields(['id', 'name', 'email', 'role', 'createdAt']) &&
+             data.id is string && data.name is string && data.name.size() > 0 &&
+             isValidEmail(data.email) &&
+             data.role in ['Admin', 'Ads Manager', 'Content Manager'] &&
+             data.createdAt is string;
+    }
+
+    function isValidProduct(data) {
+      return hasRequiredFields(['id', 'name', 'buyingPrice', 'sellingPrice', 'createdAt']) &&
+             data.id is string && data.name is string && data.name.size() > 0 &&
+             data.buyingPrice is number && data.sellingPrice is number &&
+             data.createdAt is string;
+    }
+
+    function isValidContentItem(data) {
+      return hasRequiredFields(['id', 'productId', 'title', 'type', 'status', 'scheduledDate', 'createdAt']) &&
+             data.id is string && data.productId is string && data.title is string &&
+             data.type in ['Post', 'Reel', 'Story', 'Blog', 'Video'] &&
+             data.status in ['Idea', 'In Progress', 'Review', 'Published'] &&
+             data.createdAt is string;
+    }
+
+    function isValidSocialPost(data) {
+      return hasRequiredFields(['id', 'date', 'type', 'themeProduct', 'visualDescription', 'copyCaption', 'isDone', 'createdAt']) &&
+             data.id is string && data.date is string && data.type is string &&
+             data.isDone is bool && data.createdAt is string;
+    }
+
+    function isValidAdItem(data) {
+      return hasRequiredFields(['id', 'productId', 'platform', 'status', 'mediaLinks', 'createdAt']) &&
+             data.id is string && data.productId is string &&
+             data.platform in ['Facebook', 'Google', 'TikTok'] &&
+             data.status in ['Planning', 'Ready to Live Ad', 'Live Ad'] &&
+             data.mediaLinks is list && data.createdAt is string;
+    }
+
+    function isValidAdFeedback(data) {
+      return hasRequiredFields(['id', 'productId', 'text', 'createdAt']) &&
+             data.id is string && data.productId is string && data.text is string &&
+             data.createdAt is string;
+    }
+
+    function isValidContentReport(data) {
+      return hasRequiredFields(['id', 'monthName', 'totalPosts', 'completedPosts', 'completionRate', 'archivedAt']) &&
+             data.id is string && data.monthName is string && data.totalPosts is number &&
+             data.completedPosts is number && data.completionRate is number &&
+             data.archivedAt is string;
+    }
+
+    function isValidCompanySettings(data) {
+      return hasRequiredFields(['name']) && data.name is string && data.name.size() > 0;
+    }
+
+    function isValidDeviceApproval(data) {
+      return hasRequiredFields(['id', 'userId', 'userEmail', 'userName', 'deviceId', 'deviceName', 'userAgent', 'isApproved', 'createdAt']) &&
+             data.id is string && data.userId is string && data.userEmail is string &&
+             data.userName is string && data.deviceId is string && data.deviceName is string &&
+             data.userAgent is string && data.isApproved is bool && data.createdAt is string;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

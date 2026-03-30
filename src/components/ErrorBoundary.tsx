@@ -33,7 +33,20 @@ export default class ErrorBoundary extends Component<Props, State> {
 
   public render() {
     if (this.state.hasError) {
-      const errorMessage = this.state.error?.message || 'An unexpected error occurred.';
+      let errorMessage = 'An unexpected error occurred.';
+      let isFirestoreError = false;
+
+      try {
+        // Check if it's our custom Firestore error JSON
+        const parsed = JSON.parse(this.state.error?.message || '');
+        if (parsed.error && parsed.operationType) {
+          errorMessage = `Database Error: ${parsed.error} during ${parsed.operationType} on ${parsed.path || 'unknown path'}`;
+          isFirestoreError = true;
+        }
+      } catch (e) {
+        // Not a JSON error
+        errorMessage = this.state.error?.message || errorMessage;
+      }
 
       return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -51,9 +64,12 @@ export default class ErrorBoundary extends Component<Props, State> {
                 </p>
               </div>
 
-              <p className="text-sm text-gray-500 mb-8">
-                Please try reloading the application. If the problem persists, contact support.
-              </p>
+              {isFirestoreError && (
+                <p className="text-sm text-gray-500 mb-8">
+                  This might be due to missing permissions or a configuration issue. 
+                  Please contact your administrator if this persists.
+                </p>
+              )}
               
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
                 <Button onClick={this.handleReset} className="flex items-center">

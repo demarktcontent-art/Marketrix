@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useStore } from '../store';
-import { User, Role, UserPermissions } from '../types';
-import { Plus, Edit, Trash2, Shield, Building2, Upload, Monitor, Check, X, Lock, Key } from 'lucide-react';
+import { User, UserRole } from '../types';
+import { Plus, Edit, Trash2, Shield, Building2, Upload, Monitor, Check, X, Lock } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
@@ -15,10 +15,6 @@ export default function Settings() {
     addUser, 
     updateUser, 
     deleteUser, 
-    roles,
-    addRole,
-    updateRole,
-    deleteRole,
     companySettings, 
     updateCompanySettings, 
     userProfile,
@@ -26,15 +22,11 @@ export default function Settings() {
     approveDevice,
     rejectDevice
   } = useStore();
-  const [activeTab, setActiveTab] = useState<'users' | 'devices' | 'roles'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'devices'>('users');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [isRoleDeleteModalOpen, setIsRoleDeleteModalOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
-  const [roleToDelete, setRoleToDelete] = useState<string | null>(null);
   const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [editingRole, setEditingRole] = useState<Role | null>(null);
   
   const canManageUsers = userProfile?.permissions?.canManageUsers ?? (userProfile?.role === 'Admin');
   const canEditSettings = userProfile?.permissions?.canEditSettings ?? (userProfile?.role === 'Admin');
@@ -47,35 +39,21 @@ export default function Settings() {
     name: '',
     email: '',
     password: '',
-    role: 'Ads Manager',
-    roleId: '',
+    role: 'Ads Manager' as UserRole,
     permissions: {
       canManageProducts: true,
       canManageContent: true,
       canManageAds: true,
       canManageUsers: false,
       canEditSettings: false,
-      canSeeBuyingPrice: false,
-    }
-  });
-
-  const [roleFormData, setRoleFormData] = useState({
-    name: '',
-    permissions: {
-      canManageProducts: false,
-      canManageContent: false,
-      canManageAds: false,
-      canManageUsers: false,
-      canEditSettings: false,
-      canSeeBuyingPrice: false,
     }
   });
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 700 * 1024) {
-        toast.error('Image size must be less than 700KB');
+      if (file.size > 2 * 1024 * 1024) {
+        toast.error('Image size must be less than 2MB');
         return;
       }
       const reader = new FileReader();
@@ -121,46 +99,16 @@ export default function Settings() {
         email: '', 
         password: '', 
         role: 'Ads Manager',
-        roleId: '',
         permissions: {
           canManageProducts: true,
           canManageContent: true,
           canManageAds: true,
           canManageUsers: false,
           canEditSettings: false,
-          canSeeBuyingPrice: false,
         }
       });
     } catch (error) {
       // Error handled by handleFirestoreError in store
-    }
-  };
-
-  const handleRoleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      if (editingRole) {
-        await updateRole(editingRole.id, roleFormData);
-        toast.success('Role updated successfully');
-      } else {
-        await addRole(roleFormData);
-        toast.success('Role created successfully');
-      }
-      setIsRoleModalOpen(false);
-      setEditingRole(null);
-      setRoleFormData({
-        name: '',
-        permissions: {
-          canManageProducts: false,
-          canManageContent: false,
-          canManageAds: false,
-          canManageUsers: false,
-          canEditSettings: false,
-          canSeeBuyingPrice: false,
-        }
-      });
-    } catch (error) {
-      // Error handled
     }
   };
 
@@ -171,26 +119,15 @@ export default function Settings() {
       email: user.email,
       password: user.password || '',
       role: user.role,
-      roleId: user.roleId || '',
       permissions: user.permissions || {
         canManageProducts: user.role === 'Admin' || user.role === 'Ads Manager',
         canManageContent: true,
         canManageAds: user.role === 'Admin' || user.role === 'Ads Manager',
         canManageUsers: user.role === 'Admin',
         canEditSettings: user.role === 'Admin',
-        canSeeBuyingPrice: user.role === 'Admin',
       }
     });
     setIsModalOpen(true);
-  };
-
-  const openRoleEditModal = (role: Role) => {
-    setEditingRole(role);
-    setRoleFormData({
-      name: role.name,
-      permissions: role.permissions
-    });
-    setIsRoleModalOpen(true);
   };
 
   const confirmDelete = (id: string) => {
@@ -211,20 +148,7 @@ export default function Settings() {
     }
   };
 
-  const handleRoleDelete = async () => {
-    if (roleToDelete) {
-      try {
-        await deleteRole(roleToDelete);
-        toast.success('Role deleted successfully');
-        setIsRoleDeleteModalOpen(false);
-        setRoleToDelete(null);
-      } catch (error) {
-        // Error handled
-      }
-    }
-  };
-
-  const getRoleDescription = (role: string) => {
+  const getRoleDescription = (role: UserRole) => {
     switch (role) {
       case 'Admin':
         return 'Full access to all features, including user management.';
@@ -296,51 +220,26 @@ export default function Settings() {
           <p className="text-gray-500 mt-1">Manage users and roles</p>
         </div>
         {canManageUsers && (
-          <div className="flex gap-2">
-            {activeTab === 'roles' ? (
-              <Button onClick={() => {
-                setEditingRole(null);
-                setRoleFormData({
-                  name: '',
-                  permissions: {
-                    canManageProducts: false,
-                    canManageContent: false,
-                    canManageAds: false,
-                    canManageUsers: false,
-                    canEditSettings: false,
-                    canSeeBuyingPrice: false,
-                  }
-                });
-                setIsRoleModalOpen(true);
-              }}>
-                <Plus className="w-4 h-4 mr-2" />
-                Create Role
-              </Button>
-            ) : (
-              <Button onClick={() => {
-                setEditingUser(null);
-                setFormData({ 
-                  name: '', 
-                  email: '', 
-                  password: '', 
-                  role: 'Ads Manager',
-                  roleId: '',
-                  permissions: {
-                    canManageProducts: true,
-                    canManageContent: true,
-                    canManageAds: true,
-                    canManageUsers: false,
-                    canEditSettings: false,
-                    canSeeBuyingPrice: false,
-                  }
-                });
-                setIsModalOpen(true);
-              }}>
-                <Plus className="w-4 h-4 mr-2" />
-                Add User
-              </Button>
-            )}
-          </div>
+          <Button onClick={() => {
+            setEditingUser(null);
+            setFormData({ 
+              name: '', 
+              email: '', 
+              password: '', 
+              role: 'Ads Manager',
+              permissions: {
+                canManageProducts: true,
+                canManageContent: true,
+                canManageAds: true,
+                canManageUsers: false,
+                canEditSettings: false,
+              }
+            });
+            setIsModalOpen(true);
+          }}>
+            <Plus className="w-4 h-4 mr-2" />
+            Add User
+          </Button>
         )}
       </div>
 
@@ -440,14 +339,6 @@ export default function Settings() {
                   Users
                 </button>
                 <button
-                  onClick={() => setActiveTab('roles')}
-                  className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${
-                    activeTab === 'roles' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-                  }`}
-                >
-                  Roles
-                </button>
-                <button
                   onClick={() => setActiveTab('devices')}
                   className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${
                     activeTab === 'devices' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
@@ -514,111 +405,6 @@ export default function Settings() {
                     <tr>
                       <td colSpan={4} className="p-8 text-center text-gray-500">
                         No users found.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          ) : activeTab === 'roles' ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-gray-50 text-gray-500 text-sm">
-                    <th className="p-4 font-medium border-b border-gray-200">Role Name</th>
-                    <th className="p-4 font-medium border-b border-gray-200">Permissions</th>
-                    <th className="p-4 font-medium border-b border-gray-200 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {roles?.map((role) => (
-                    <tr key={role.id} className="hover:bg-gray-50">
-                      <td className="p-4">
-                        <div className="font-medium text-gray-900">{role.name}</div>
-                        <div className="text-xs text-gray-400 mt-1">Created: {new Date(role.createdAt).toLocaleDateString()}</div>
-                      </td>
-                      <td className="p-4">
-                        <div className="flex flex-wrap gap-1">
-                          {Object.entries(role.permissions).map(([key, value]) => value && (
-                            <span key={key} className="px-1.5 py-0.5 bg-gray-100 text-gray-600 text-[10px] rounded border border-gray-200">
-                              {key.replace('can', '')}
-                            </span>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="p-4 text-right">
-                        <div className="flex justify-end space-x-2">
-                          <Button variant="ghost" size="sm" onClick={() => openRoleEditModal(role)}>
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                            onClick={() => {
-                              setRoleToDelete(role.id);
-                              setIsRoleDeleteModalOpen(true);
-                            }}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                  {(!roles || roles.length === 0) && (
-                    <tr>
-                      <td colSpan={3} className="p-8 text-center text-gray-500">
-                        <div className="space-y-3">
-                          <p>No custom roles found.</p>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={async () => {
-                              const defaultRoles = [
-                                {
-                                  name: 'Admin',
-                                  permissions: {
-                                    canManageProducts: true,
-                                    canManageContent: true,
-                                    canManageAds: true,
-                                    canManageUsers: true,
-                                    canEditSettings: true,
-                                    canSeeBuyingPrice: true,
-                                  }
-                                },
-                                {
-                                  name: 'Ads Manager',
-                                  permissions: {
-                                    canManageProducts: true,
-                                    canManageContent: true,
-                                    canManageAds: true,
-                                    canManageUsers: false,
-                                    canEditSettings: false,
-                                    canSeeBuyingPrice: false,
-                                  }
-                                },
-                                {
-                                  name: 'Content Manager',
-                                  permissions: {
-                                    canManageProducts: false,
-                                    canManageContent: true,
-                                    canManageAds: false,
-                                    canManageUsers: false,
-                                    canEditSettings: false,
-                                    canSeeBuyingPrice: false,
-                                  }
-                                }
-                              ];
-                              for (const r of defaultRoles) {
-                                await addRole(r);
-                              }
-                              toast.success('Default roles bootstrapped');
-                            }}
-                          >
-                            Bootstrap Default Roles
-                          </Button>
-                        </div>
                       </td>
                     </tr>
                   )}
@@ -752,68 +538,44 @@ export default function Settings() {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
             <Select
-              value={formData.roleId || formData.role}
+              value={formData.role}
               onChange={(e) => {
-                const val = e.target.value;
-                const selectedRole = roles.find(r => r.id === val);
+                const newRole = e.target.value as UserRole;
+                let newPermissions = { ...formData.permissions };
                 
-                if (selectedRole) {
-                  setFormData({
-                    ...formData,
-                    role: selectedRole.name,
-                    roleId: selectedRole.id,
-                    permissions: selectedRole.permissions
-                  });
-                } else {
-                  // Fallback for default roles
-                  const newRole = val;
-                  let newPermissions = { ...formData.permissions };
-                  
-                  if (newRole === 'Admin') {
-                    newPermissions = {
-                      canManageProducts: true,
-                      canManageContent: true,
-                      canManageAds: true,
-                      canManageUsers: true,
-                      canEditSettings: true,
-                      canSeeBuyingPrice: true,
-                    };
-                  } else if (newRole === 'Ads Manager') {
-                    newPermissions = {
-                      canManageProducts: true,
-                      canManageContent: true,
-                      canManageAds: true,
-                      canManageUsers: false,
-                      canEditSettings: false,
-                      canSeeBuyingPrice: false,
-                    };
-                  } else if (newRole === 'Content Manager') {
-                    newPermissions = {
-                      canManageProducts: false,
-                      canManageContent: true,
-                      canManageAds: false,
-                      canManageUsers: false,
-                      canEditSettings: false,
-                      canSeeBuyingPrice: false,
-                    };
-                  }
-                  
-                  setFormData({ ...formData, role: newRole, roleId: '', permissions: newPermissions });
+                // Auto-update permissions based on role if they haven't been customized
+                if (newRole === 'Admin') {
+                  newPermissions = {
+                    canManageProducts: true,
+                    canManageContent: true,
+                    canManageAds: true,
+                    canManageUsers: true,
+                    canEditSettings: true,
+                  };
+                } else if (newRole === 'Ads Manager') {
+                  newPermissions = {
+                    canManageProducts: true,
+                    canManageContent: true,
+                    canManageAds: true,
+                    canManageUsers: false,
+                    canEditSettings: false,
+                  };
+                } else if (newRole === 'Content Manager') {
+                  newPermissions = {
+                    canManageProducts: false,
+                    canManageContent: true,
+                    canManageAds: false,
+                    canManageUsers: false,
+                    canEditSettings: false,
+                  };
                 }
+                
+                setFormData({ ...formData, role: newRole, permissions: newPermissions });
               }}
             >
-              <optgroup label="Default Roles">
-                <option value="Ads Manager">Ads Manager</option>
-                <option value="Content Manager">Content Manager</option>
-                <option value="Admin">Admin</option>
-              </optgroup>
-              {roles.length > 0 && (
-                <optgroup label="Custom Roles">
-                  {roles.map(r => (
-                    <option key={r.id} value={r.id}>{r.name}</option>
-                  ))}
-                </optgroup>
-              )}
+              <option value="Ads Manager">Ads Manager</option>
+              <option value="Content Manager">Content Manager</option>
+              <option value="Admin">Admin</option>
             </Select>
             <p className="text-xs text-gray-500 mt-2">
               {getRoleDescription(formData.role)}
@@ -883,18 +645,6 @@ export default function Settings() {
                 />
                 <span className="text-sm text-gray-700 group-hover:text-gray-900">Edit Company Settings</span>
               </label>
-              <label className="flex items-center gap-3 cursor-pointer group">
-                <input
-                  type="checkbox"
-                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  checked={formData.permissions.canSeeBuyingPrice}
-                  onChange={(e) => setFormData({
-                    ...formData,
-                    permissions: { ...formData.permissions, canSeeBuyingPrice: e.target.checked }
-                  })}
-                />
-                <span className="text-sm text-gray-700 group-hover:text-gray-900">See Buying Price</span>
-              </label>
             </div>
           </div>
           <div className="mt-6 flex justify-end space-x-3">
@@ -906,75 +656,6 @@ export default function Settings() {
             </Button>
           </div>
         </form>
-      </Modal>
-
-      <Modal
-        isOpen={isRoleModalOpen}
-        onClose={() => setIsRoleModalOpen(false)}
-        title={editingRole ? 'Edit Role' : 'Create New Role'}
-      >
-        <form onSubmit={handleRoleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Role Name</label>
-            <Input
-              required
-              value={roleFormData.name}
-              onChange={(e) => setRoleFormData({ ...roleFormData, name: e.target.value })}
-              placeholder="e.g. Viewer, Supervisor"
-            />
-          </div>
-
-          <div className="pt-2">
-            <label className="block text-sm font-medium text-gray-700 mb-3">Permissions</label>
-            <div className="space-y-3 bg-gray-50 p-4 rounded-lg border border-gray-100">
-              {Object.keys(roleFormData.permissions).map((permKey) => (
-                <label key={permKey} className="flex items-center gap-3 cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    checked={roleFormData.permissions[permKey as keyof UserPermissions]}
-                    onChange={(e) => setRoleFormData({
-                      ...roleFormData,
-                      permissions: { ...roleFormData.permissions, [permKey]: e.target.checked }
-                    })}
-                  />
-                  <span className="text-sm text-gray-700 group-hover:text-gray-900">
-                    {permKey.replace('can', '').replace(/([A-Z])/g, ' $1').trim()}
-                  </span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-6 flex justify-end space-x-3">
-            <Button type="button" variant="ghost" onClick={() => setIsRoleModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit">
-              {editingRole ? 'Save Changes' : 'Create Role'}
-            </Button>
-          </div>
-        </form>
-      </Modal>
-
-      <Modal
-        isOpen={isRoleDeleteModalOpen}
-        onClose={() => setIsRoleDeleteModalOpen(false)}
-        title="Confirm Role Deletion"
-      >
-        <div className="space-y-4">
-          <p className="text-gray-600">
-            Are you sure you want to delete this role? Users assigned to this role will keep their current permissions but will no longer be linked to this role definition.
-          </p>
-          <div className="flex justify-end space-x-3">
-            <Button variant="ghost" onClick={() => setIsRoleDeleteModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant="danger" onClick={handleRoleDelete}>
-              Delete Role
-            </Button>
-          </div>
-        </div>
       </Modal>
 
       <Modal

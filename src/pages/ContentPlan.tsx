@@ -198,7 +198,7 @@ export default function ContentPlan() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Content Plan</h2>
+        <h2 className="text-2xl font-bold text-gray-900">Content Plan</h2>
         <div className="flex space-x-3">
           {canManageContent && (
             <>
@@ -218,25 +218,25 @@ export default function ContentPlan() {
         </div>
       </div>
 
-      <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
-        <div className="border-b border-gray-200 dark:border-gray-800">
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <div className="border-b border-gray-200">
           <nav className="flex -mb-px">
             <button
               onClick={() => setActiveTab('monthly')}
-              className={`w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm transition-colors ${
+              className={`w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm ${
                 activeTab === 'monthly'
-                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-700'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
               Monthly Calendar ({socialPosts.length})
             </button>
             <button
               onClick={() => setActiveTab('ideas')}
-              className={`w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm transition-colors ${
+              className={`w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm ${
                 activeTab === 'ideas'
-                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-700'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
               Product Ideas Board ({contentItems.length})
@@ -251,29 +251,29 @@ export default function ContentPlan() {
                 <div className="space-y-6">
                   <div className="space-y-4">
                     {sortedPosts.map((post) => (
-                      <Card key={post.id} className={`transition-all ${post.isDone ? 'bg-gray-50 dark:bg-gray-950/50 opacity-75' : 'bg-white dark:bg-gray-900'} ${selectedPosts.has(post.id) ? 'ring-2 ring-blue-500' : ''}`}>
+                      <Card key={post.id} className={`transition-all ${post.isDone ? 'bg-gray-50 opacity-75' : 'bg-white'} ${selectedPosts.has(post.id) ? 'ring-2 ring-blue-500' : ''}`}>
                         <div className="p-4 flex flex-col md:flex-row gap-4">
                           {/* Left Column: Meta */}
-                          <div className="md:w-1/4 space-y-2 border-b md:border-b-0 md:border-r border-gray-100 dark:border-gray-800 pb-4 md:pb-0 md:pr-4">
+                          <div className="md:w-1/4 space-y-2 border-b md:border-b-0 md:border-r border-gray-100 pb-4 md:pb-0 md:pr-4">
                             <div className="flex items-center justify-between">
-                              <div className="flex items-center text-sm font-bold text-gray-900 dark:text-gray-100">
+                              <div className="flex items-center text-sm font-bold text-gray-900">
                                 <button
                                   onClick={() => toggleSelectPost(post.id)}
-                                  className="mr-2 text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400"
+                                  className="mr-2 text-gray-400 hover:text-gray-600"
                                 >
                                   {selectedPosts.has(post.id) ? (
-                                    <CheckSquare className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                                    <CheckSquare className="h-5 w-5 text-blue-600" />
                                   ) : (
                                     <Square className="h-5 w-5" />
                                   )}
                                 </button>
-                                <Calendar className="h-4 w-4 mr-1.5 text-gray-500 dark:text-gray-400" />
+                                <Calendar className="h-4 w-4 mr-1.5 text-gray-500" />
                                 {post.date || 'No Date'}
                               </div>
                               {canManageContent && (
                                 <button 
                                   onClick={() => toggleSocialPostDone(post.id)}
-                                  className={`flex items-center justify-center rounded-full p-1 transition-colors ${post.isDone ? 'text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20' : 'text-gray-400 dark:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+                                  className={`flex items-center justify-center rounded-full p-1 transition-colors ${post.isDone ? 'text-green-600 hover:bg-green-50' : 'text-gray-400 hover:bg-gray-100'}`}
                                   title={post.isDone ? "Mark as Undone" : "Mark as Done"}
                                 >
                                   {post.isDone ? <CheckCircle className="h-6 w-6" /> : <Circle className="h-6 w-6" />}
@@ -282,45 +282,45 @@ export default function ContentPlan() {
                             </div>
                             
                             {post.type && (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                                 {post.type}
                               </span>
                             )}
                             
                             <div>
-                              <h4 className={`text-sm font-semibold ${post.isDone ? 'line-through text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-gray-100'}`}>
+                              <h4 className={`text-sm font-semibold ${post.isDone ? 'line-through text-gray-500' : 'text-gray-900'}`}>
                                 {post.themeProduct}
                               </h4>
                             </div>
                           </div>
 
                           {/* Middle Column: Visual Description */}
-                          <div className="md:w-1/3 space-y-1 border-b md:border-b-0 md:border-r border-gray-100 dark:border-gray-800 pb-4 md:pb-0 md:pr-4">
-                            <h5 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Visual Description</h5>
-                            <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{post.visualDescription}</p>
+                          <div className="md:w-1/3 space-y-1 border-b md:border-b-0 md:border-r border-gray-100 pb-4 md:pb-0 md:pr-4">
+                            <h5 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Visual Description</h5>
+                            <p className="text-sm text-gray-700 whitespace-pre-wrap">{post.visualDescription}</p>
                           </div>
 
                           {/* Right Column: Caption & Actions */}
                           <div className="md:w-5/12 space-y-2 flex flex-col">
                             <div className="flex justify-between items-center">
-                              <h5 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Copy Caption</h5>
+                              <h5 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Copy Caption</h5>
                               <div className="flex space-x-2">
-                                <Button variant="ghost" size="sm" onClick={() => copyToClipboard(post.copyCaption)} className="h-8 px-2 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20">
+                                <Button variant="ghost" size="sm" onClick={() => copyToClipboard(post.copyCaption)} className="h-8 px-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50">
                                   <Copy className="h-4 w-4 mr-1.5" /> Copy
                                 </Button>
                                 {canManageContent && (
                                   <>
-                                    <Button variant="ghost" size="sm" onClick={() => handleEditPost(post)} className="h-8 px-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800">
+                                    <Button variant="ghost" size="sm" onClick={() => handleEditPost(post)} className="h-8 px-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100">
                                       <Edit className="h-4 w-4" />
                                     </Button>
-                                    <Button variant="ghost" size="sm" onClick={() => confirmDelete(post.id)} className="h-8 px-2 text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20">
+                                    <Button variant="ghost" size="sm" onClick={() => confirmDelete(post.id)} className="h-8 px-2 text-red-500 hover:text-red-600 hover:bg-red-50">
                                       <Trash2 className="h-4 w-4" />
                                     </Button>
                                   </>
                                 )}
                               </div>
                             </div>
-                            <div className="bg-gray-50 dark:bg-gray-950 p-3 rounded-md border border-gray-100 dark:border-gray-800 text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap flex-1">
+                            <div className="bg-gray-50 p-3 rounded-md border border-gray-100 text-sm text-gray-800 whitespace-pre-wrap flex-1">
                               {post.copyCaption}
                             </div>
                           </div>
@@ -330,21 +330,21 @@ export default function ContentPlan() {
                   </div>
 
                   {/* Bulk Actions and Archive at the bottom */}
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gray-50 dark:bg-gray-950/50 p-3 rounded-lg border border-gray-200 dark:border-gray-800">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gray-50 p-3 rounded-lg border border-gray-200">
                     <div className="flex items-center space-x-4">
                       <button
                         onClick={toggleSelectAll}
-                        className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
+                        className="flex items-center text-sm font-medium text-gray-700 hover:text-gray-900"
                       >
                         {selectedPosts.size === sortedPosts.length && sortedPosts.length > 0 ? (
-                          <CheckSquare className="h-5 w-5 mr-2 text-blue-600 dark:text-blue-400" />
+                          <CheckSquare className="h-5 w-5 mr-2 text-blue-600" />
                         ) : (
-                          <Square className="h-5 w-5 mr-2 text-gray-400 dark:text-gray-600" />
+                          <Square className="h-5 w-5 mr-2 text-gray-400" />
                         )}
                         Select All
                       </button>
                       {selectedPosts.size > 0 && (
-                        <span className="text-sm text-gray-500 dark:text-gray-400">
+                        <span className="text-sm text-gray-500">
                           {selectedPosts.size} selected
                         </span>
                       )}
@@ -361,7 +361,7 @@ export default function ContentPlan() {
                             <Circle className="h-4 w-4 mr-2" />
                             Mark Undone
                           </Button>
-                          <Button variant="outline" size="sm" onClick={confirmBulkDelete} className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20">
+                          <Button variant="outline" size="sm" onClick={confirmBulkDelete} className="text-red-600 hover:text-red-700 hover:bg-red-50">
                             <Trash2 className="h-4 w-4 mr-2" />
                             Delete
                           </Button>
@@ -377,10 +377,10 @@ export default function ContentPlan() {
                   </div>
                 </div>
               ) : (
-                <div className="text-center py-16 px-4 border-2 border-dashed border-gray-300 dark:border-gray-800 rounded-lg bg-gray-50 dark:bg-gray-950/50">
-                  <Calendar className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-600 mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No imported posts yet</h3>
-                  <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto mb-6">
+                <div className="text-center py-16 px-4 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
+                  <Calendar className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No imported posts yet</h3>
+                  <p className="text-gray-500 max-w-md mx-auto mb-6">
                     Import your monthly content plan from an Excel or CSV file. Ensure your columns have headers like "Date", "Type", "Theme", "Visual Description", and "Caption".
                   </p>
                   {canManageContent && (
@@ -399,32 +399,32 @@ export default function ContentPlan() {
               {statuses.map(status => {
                 const items = contentItems.filter(c => c.status === status);
                 return (
-                  <div key={status} className="flex-1 min-w-[300px] bg-gray-100 dark:bg-gray-800 rounded-lg p-4">
-                    <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-4 flex justify-between items-center">
+                  <div key={status} className="flex-1 min-w-[300px] bg-gray-100 rounded-lg p-4">
+                    <h3 className="font-semibold text-gray-700 mb-4 flex justify-between items-center">
                       {status}
-                      <span className="bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 py-0.5 px-2 rounded-full text-xs">{items.length}</span>
+                      <span className="bg-gray-200 text-gray-600 py-0.5 px-2 rounded-full text-xs">{items.length}</span>
                     </h3>
                     <div className="space-y-3">
                       {items.map(item => (
-                        <Card key={item.id} className="bg-white dark:bg-gray-900 shadow-sm border-gray-200 dark:border-gray-800">
+                        <Card key={item.id} className="bg-white shadow-sm border-gray-200">
                           <CardContent className="p-4">
                             <div className="flex justify-between items-start mb-1">
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700">
                                 {item.type}
                               </span>
-                              <span className="text-xs text-gray-400 dark:text-gray-500">
+                              <span className="text-xs text-gray-400">
                                 {item.scheduledDate ? new Date(item.scheduledDate).toLocaleDateString() : ''}
                               </span>
                             </div>
-                            <h4 className="font-medium text-gray-900 dark:text-gray-100 text-sm mb-1">{item.title}</h4>
-                            <Link to={`/products/${item.productId}`} className="text-xs text-blue-600 dark:text-blue-400 hover:underline">
+                            <h4 className="font-medium text-gray-900 text-sm mb-1">{item.title}</h4>
+                            <Link to={`/products/${item.productId}`} className="text-xs text-blue-600 hover:underline">
                               {getProductName(item.productId)}
                             </Link>
                           </CardContent>
                         </Card>
                       ))}
                       {items.length === 0 && (
-                        <div className="text-center py-4 text-sm text-gray-400 dark:text-gray-600 border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-lg">
+                        <div className="text-center py-4 text-sm text-gray-400 border-2 border-dashed border-gray-200 rounded-lg">
                           No items
                         </div>
                       )}
@@ -443,11 +443,11 @@ export default function ContentPlan() {
         title="Archive Current Plan"
       >
         <form onSubmit={handleArchive} className="space-y-4">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
+          <p className="text-sm text-gray-600">
             This will save your current progress as a report and clear the board so you can import a new month's plan.
           </p>
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Report Name (e.g., February 2026)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Report Name (e.g., February 2026)</label>
             <Input
               required
               value={archiveMonthName}
@@ -500,18 +500,18 @@ export default function ContentPlan() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Visual Description</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Visual Description</label>
               <textarea
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 rows={3}
                 value={editingPost.visualDescription}
                 onChange={(e) => setEditingPost({ ...editingPost, visualDescription: e.target.value })}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Caption</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Caption</label>
               <textarea
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 rows={5}
                 value={editingPost.copyCaption}
                 onChange={(e) => setEditingPost({ ...editingPost, copyCaption: e.target.value })}
@@ -538,7 +538,7 @@ export default function ContentPlan() {
         title="Confirm Deletion"
       >
         <div className="space-y-4">
-          <p className="text-gray-600 dark:text-gray-400">
+          <p className="text-gray-600">
             Are you sure you want to delete {postsToDelete.length === 1 ? 'this post' : `${postsToDelete.length} posts`}? This action cannot be undone.
           </p>
           <div className="flex justify-end space-x-3">

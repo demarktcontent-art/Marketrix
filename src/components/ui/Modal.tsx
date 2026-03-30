@@ -32,14 +32,14 @@ export function Modal({ isOpen, onClose, title, children, className }: ModalProp
         aria-hidden="true"
       />
       
-      <div className={cn("relative w-full max-w-lg transform rounded-xl bg-white dark:bg-gray-900 p-6 text-left shadow-xl transition-all sm:my-8", className)}>
+      <div className={cn("relative w-full max-w-lg transform rounded-xl bg-white p-6 text-left shadow-xl transition-all sm:my-8", className)}>
         <div className="flex items-center justify-between mb-5">
-          <h3 className="text-lg font-semibold leading-6 text-gray-900 dark:text-gray-100">
+          <h3 className="text-lg font-semibold leading-6 text-gray-900">
             {title}
           </h3>
           <button
             type="button"
-            className="rounded-md bg-white dark:bg-gray-900 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+            className="rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
             onClick={onClose}
           >
             <span className="sr-only">Close</span>
