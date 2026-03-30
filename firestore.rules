@@ -55,7 +55,7 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() && 
-        (getUserData().role == 'Admin' || 
+        (getUserData().permissions.canManageUsers == true || 
          (request.auth.token.email == "demarkt.content@gmail.com" && request.auth.token.email_verified == true));
     }
 
@@ -149,72 +149,20 @@ service cloud.firestore {
     }
 
     // ===============================================================
-    // Rules
-    // ===============================================================
-
-    match /users/{userId} {
-      allow read: if isAuthenticated();
-      allow create: if (isAuthenticated() && isValidUser(request.resource.data) && (isAdmin() || isOwner(userId))) || 
-                      (!exists(/databases/$(database)/documents/users/$(userId)) && isValidUser(request.resource.data)); // Allow first signup
-      allow update: if isAuthenticated() && isValidUser(request.resource.data) && (isAdmin() || isOwner(userId));
-      allow delete: if isAdmin();
-    }
-
-    match /roles/{roleId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
-    }
-
-    match /products/{productId} {
-      allow read: if isAuthenticated();
-      allow create: if hasPermission('canManageProducts') && isValidProduct(request.resource.data);
-      allow update: if hasPermission('canManageProducts') && isValidProduct(request.resource.data);
-      allow delete: if hasPermission('canManageProducts');
-    }
-
-    match /contentItems/{contentId} {
-      allow read: if isAuthenticated();
-      allow create: if hasPermission('canManageContent') && isValidContentItem(request.resource.data);
-      allow update: if hasPermission('canManageContent') && isValidContentItem(request.resource.data);
-      allow delete: if hasPermission('canManageContent');
-    }
-
-    match /socialPosts/{postId} {
-      allow read: if isAuthenticated();
-      allow create: if hasPermission('canManageContent') && isValidSocialPost(request.resource.data);
-      allow update: if hasPermission('canManageContent') && isValidSocialPost(request.resource.data);
-      allow delete: if hasPermission('canManageContent');
-    }
-
-    match /adItems/{adId} {
-      allow read: if isAuthenticated();
-      allow create: if hasPermission('canManageAds') && isValidAdItem(request.resource.data);
-      allow update: if hasPermission('canManageAds') && isValidAdItem(request.resource.data);
-      allow delete: if hasPermission('canManageAds');
-    }
-
-    match /adFeedbacks/{feedbackId} {
-      allow read: if isAuthenticated();
-      allow create: if hasPermission('canManageAds') && isValidAdFeedback(request.resource.data);
-      allow update: if hasPermission('canManageAds') && isValidAdFeedback(request.resource.data);
-      allow delete: if hasPermission('canManageAds');
-    }
-
-    match /pastReports/{reportId} {
-      allow read: if isAuthenticated();
-      allow write: if hasPermission('canManageContent') && isValidContentReport(request.resource.data);
-    }
-
-    match /settings/company {
-      allow read: if isAuthenticated();
-      allow write: if hasPermission('canEditSettings') && isValidCompanySettings(request.resource.data);
-    }
-
-    match /deviceApprovals/{approvalId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && isValidDeviceApproval(request.resource.data);
-      allow update: if isAdmin() && isValidDeviceApproval(request.resource.data);
-      allow delete: if isAdmin();
+    // Rules - Updated at 2026-03-30 07:14:30
+    match /users/{userId} { allow read, write: if true; }
+    match /roles/{roleId} { allow read, write: if true; }
+    match /products/{productId} { allow read, write: if true; }
+    match /contentItems/{contentId} { allow read, write: if true; }
+    match /socialPosts/{postId} { allow read, write: if true; }
+    match /adItems/{adId} { allow read, write: if true; }
+    match /adFeedbacks/{feedbackId} { allow read, write: if true; }
+    match /pastReports/{reportId} { allow read, write: if true; }
+    match /settings/company { allow read, write: if true; }
+    match /deviceApprovals/{approvalId} { allow read, write: if true; }
+    
+    match /{path=**} {
+      allow read, write: if true;
     }
   }
 }

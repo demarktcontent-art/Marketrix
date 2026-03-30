@@ -74,8 +74,8 @@ export default function Settings() {
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        toast.error('Image size must be less than 2MB');
+      if (file.size > 700 * 1024) {
+        toast.error('Image size must be less than 700KB');
         return;
       }
       const reader = new FileReader();
@@ -559,7 +559,6 @@ export default function Settings() {
                               setRoleToDelete(role.id);
                               setIsRoleDeleteModalOpen(true);
                             }}
-                            disabled={['Admin', 'Ads Manager', 'Content Manager'].includes(role.name)}
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
@@ -570,7 +569,56 @@ export default function Settings() {
                   {(!roles || roles.length === 0) && (
                     <tr>
                       <td colSpan={3} className="p-8 text-center text-gray-500">
-                        No custom roles found.
+                        <div className="space-y-3">
+                          <p>No custom roles found.</p>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={async () => {
+                              const defaultRoles = [
+                                {
+                                  name: 'Admin',
+                                  permissions: {
+                                    canManageProducts: true,
+                                    canManageContent: true,
+                                    canManageAds: true,
+                                    canManageUsers: true,
+                                    canEditSettings: true,
+                                    canSeeBuyingPrice: true,
+                                  }
+                                },
+                                {
+                                  name: 'Ads Manager',
+                                  permissions: {
+                                    canManageProducts: true,
+                                    canManageContent: true,
+                                    canManageAds: true,
+                                    canManageUsers: false,
+                                    canEditSettings: false,
+                                    canSeeBuyingPrice: false,
+                                  }
+                                },
+                                {
+                                  name: 'Content Manager',
+                                  permissions: {
+                                    canManageProducts: false,
+                                    canManageContent: true,
+                                    canManageAds: false,
+                                    canManageUsers: false,
+                                    canEditSettings: false,
+                                    canSeeBuyingPrice: false,
+                                  }
+                                }
+                              ];
+                              for (const r of defaultRoles) {
+                                await addRole(r);
+                              }
+                              toast.success('Default roles bootstrapped');
+                            }}
+                          >
+                            Bootstrap Default Roles
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   )}

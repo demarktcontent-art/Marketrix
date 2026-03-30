@@ -159,7 +159,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               className="flex items-center gap-2 hover:opacity-80 transition-opacity group"
             >
               {companySettings.logoUrl && (
-                <img src={companySettings.logoUrl} alt="Logo" className="w-8 h-8 object-contain rounded" />
+                <img src={companySettings.logoUrl} alt="Logo" className="h-6 w-auto object-contain rounded-sm" />
               )}
               <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 truncate max-w-[150px] sm:max-w-[250px] md:max-w-none">
                 {companySettings.name || 'MarketPlan'}
