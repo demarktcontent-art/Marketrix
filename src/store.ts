@@ -440,19 +440,33 @@ export const useStore = create<AppState>((set, get) => {
 
 // Initialize session persistence
 const initStore = () => {
-  const store = useStore.getState();
-  const userId = localStorage.getItem('marketplan_user_id');
-  
-  if (userId) {
-    const user = store.users.find(u => u.id === userId);
-    if (user) {
-      store.setCurrentUser({ uid: user.id, email: user.email });
-      store.setUserProfile(user);
-    } else {
-      localStorage.removeItem('marketplan_user_id');
+  try {
+    console.log('Initializing store...');
+    const store = useStore.getState();
+    const userId = localStorage.getItem('marketplan_user_id');
+    
+    if (userId) {
+      const user = store.users.find(u => u.id === userId);
+      if (user) {
+        store.setCurrentUser({ uid: user.id, email: user.email });
+        store.setUserProfile(user);
+        console.log('User session restored:', user.email);
+      } else {
+        localStorage.removeItem('marketplan_user_id');
+        console.log('User session invalid, cleared');
+      }
     }
+    store.setAuthReady(true);
+    console.log('Store initialization complete');
+  } catch (error) {
+    console.error('Failed to initialize store:', error);
+    // Still set auth ready to avoid infinite spinner if possible
+    useStore.getState().setAuthReady(true);
   }
-  store.setAuthReady(true);
 };
 
-initStore();
+try {
+  initStore();
+} catch (error) {
+  console.error('Fatal error in store initialization:', error);
+}
