@@ -25,6 +25,7 @@ const getDefaultPermissions = (role: UserRole): UserPermissions => {
         canManageAds: true,
         canManageUsers: true,
         canEditSettings: true,
+        canSeePrice: true,
       };
     case 'Ads Manager':
       return {
@@ -33,6 +34,7 @@ const getDefaultPermissions = (role: UserRole): UserPermissions => {
         canManageAds: true,
         canManageUsers: false,
         canEditSettings: false,
+        canSeePrice: true,
       };
     case 'Content Manager':
       return {
@@ -41,6 +43,7 @@ const getDefaultPermissions = (role: UserRole): UserPermissions => {
         canManageAds: false,
         canManageUsers: false,
         canEditSettings: false,
+        canSeePrice: false,
       };
     default:
       return {
@@ -49,6 +52,7 @@ const getDefaultPermissions = (role: UserRole): UserPermissions => {
         canManageAds: false,
         canManageUsers: false,
         canEditSettings: false,
+        canSeePrice: false,
       };
   }
 };
@@ -168,6 +172,7 @@ export const useStore = create<AppState>((set, get) => ({
             password,
             role: 'Admin',
             permissions: getDefaultPermissions('Admin'),
+            approvedDevices: [],
             createdAt: new Date().toISOString()
           };
           try {
@@ -251,6 +256,7 @@ export const useStore = create<AppState>((set, get) => ({
         password,
         role: 'Admin',
         permissions: getDefaultPermissions('Admin'),
+        approvedDevices: [],
         createdAt: new Date().toISOString()
       };
       await setDoc(doc(db, 'users', id), userData);
@@ -357,7 +363,18 @@ export const useStore = create<AppState>((set, get) => ({
   },
   updateAd: async (id, updatedAd) => {
     try {
-      await updateDoc(doc(db, 'adItems', id), updatedAd);
+      const ad = get().adItems.find(a => a.id === id);
+      const finalUpdate = { ...updatedAd };
+      
+      if (ad && updatedAd.status) {
+        if (updatedAd.status === 'Live Ad' && ad.status !== 'Live Ad') {
+          finalUpdate.startTime = new Date().toISOString();
+        } else if (updatedAd.status === 'Stopped' && ad.status !== 'Stopped') {
+          finalUpdate.endTime = new Date().toISOString();
+        }
+      }
+      
+      await updateDoc(doc(db, 'adItems', id), finalUpdate);
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `adItems/${id}`);
     }
@@ -485,6 +502,7 @@ export const useStore = create<AppState>((set, get) => ({
         ...user, 
         id, 
         permissions: user.permissions || getDefaultPermissions(user.role),
+        approvedDevices: [],
         createdAt: new Date().toISOString() 
       };
       await setDoc(doc(db, 'users', id), newUser);
@@ -514,67 +532,65 @@ const initStore = async () => {
   const userId = localStorage.getItem('marketplan_user_id');
   
   if (userId) {
-    try {
-      const userDoc = await getDoc(doc(db, 'users', userId));
-      if (userDoc.exists()) {
-        const userData = userDoc.data() as User;
-        store.setCurrentUser({ uid: userData.id, email: userData.email });
-        store.setUserProfile(userData);
-        
-        // Set up Firestore listeners
-        const unsubscribes = [
-          onSnapshot(collection(db, 'products'), (snapshot) => {
-            useStore.setState({ products: snapshot.docs.map(doc => doc.data() as Product) });
-          }, (error) => handleFirestoreError(error, OperationType.LIST, 'products')),
+    const userDoc = await getDoc(doc(db, 'users', userId));
+    if (userDoc.exists()) {
+      const userData = userDoc.data() as User;
+      store.setCurrentUser({ uid: userData.id, email: userData.email });
+      store.setUserProfile(userData);
+      
+      // Set up Firestore listeners
+      const unsubscribes = [
+        onSnapshot(collection(db, 'products'), (snapshot) => {
+          useStore.setState({ products: snapshot.docs.map(doc => doc.data() as Product) });
+        }, (error) => handleFirestoreError(error, OperationType.LIST, 'products')),
 
-          onSnapshot(collection(db, 'contentItems'), (snapshot) => {
-            useStore.setState({ contentItems: snapshot.docs.map(doc => doc.data() as ContentItem) });
-          }, (error) => handleFirestoreError(error, OperationType.LIST, 'contentItems')),
+        onSnapshot(collection(db, 'contentItems'), (snapshot) => {
+          useStore.setState({ contentItems: snapshot.docs.map(doc => doc.data() as ContentItem) });
+        }, (error) => handleFirestoreError(error, OperationType.LIST, 'contentItems')),
 
-          onSnapshot(collection(db, 'adItems'), (snapshot) => {
-            useStore.setState({ adItems: snapshot.docs.map(doc => doc.data() as AdItem) });
-          }, (error) => handleFirestoreError(error, OperationType.LIST, 'adItems')),
+        onSnapshot(collection(db, 'adItems'), (snapshot) => {
+          useStore.setState({ adItems: snapshot.docs.map(doc => doc.data() as AdItem) });
+        }, (error) => handleFirestoreError(error, OperationType.LIST, 'adItems')),
 
-          onSnapshot(collection(db, 'socialPosts'), (snapshot) => {
-            useStore.setState({ socialPosts: snapshot.docs.map(doc => doc.data() as SocialPost) });
-          }, (error) => handleFirestoreError(error, OperationType.LIST, 'socialPosts')),
+        onSnapshot(collection(db, 'socialPosts'), (snapshot) => {
+          useStore.setState({ socialPosts: snapshot.docs.map(doc => doc.data() as SocialPost) });
+        }, (error) => handleFirestoreError(error, OperationType.LIST, 'socialPosts')),
 
-          onSnapshot(collection(db, 'pastReports'), (snapshot) => {
-            useStore.setState({ pastReports: snapshot.docs.map(doc => doc.data() as ContentReport) });
-          }, (error) => handleFirestoreError(error, OperationType.LIST, 'pastReports')),
+        onSnapshot(collection(db, 'pastReports'), (snapshot) => {
+          useStore.setState({ pastReports: snapshot.docs.map(doc => doc.data() as ContentReport) });
+        }, (error) => handleFirestoreError(error, OperationType.LIST, 'pastReports')),
 
-          onSnapshot(collection(db, 'adFeedbacks'), (snapshot) => {
-            useStore.setState({ adFeedbacks: snapshot.docs.map(doc => doc.data() as AdFeedback) });
-          }, (error) => handleFirestoreError(error, OperationType.LIST, 'adFeedbacks')),
+        onSnapshot(collection(db, 'adFeedbacks'), (snapshot) => {
+          useStore.setState({ adFeedbacks: snapshot.docs.map(doc => doc.data() as AdFeedback) });
+        }, (error) => handleFirestoreError(error, OperationType.LIST, 'adFeedbacks')),
 
-          onSnapshot(collection(db, 'deviceApprovals'), (snapshot) => {
-            useStore.setState({ deviceApprovals: snapshot.docs.map(doc => doc.data() as DeviceApproval) });
-          }, (error) => handleFirestoreError(error, OperationType.LIST, 'deviceApprovals')),
+        onSnapshot(collection(db, 'deviceApprovals'), (snapshot) => {
+          useStore.setState({ deviceApprovals: snapshot.docs.map(doc => doc.data() as DeviceApproval) });
+        }, (error) => handleFirestoreError(error, OperationType.LIST, 'deviceApprovals')),
 
-          onSnapshot(collection(db, 'users'), (snapshot) => {
-            const users = snapshot.docs.map(doc => doc.data() as User);
-            useStore.setState({ users });
-            
-            // Update current user profile if it changed
-            const currentProfile = users.find(u => u.id === userId);
-            if (currentProfile) {
-              store.setUserProfile(currentProfile);
-            }
-          }, (error) => handleFirestoreError(error, OperationType.LIST, 'users')),
+        onSnapshot(collection(db, 'users'), (snapshot) => {
+          const users = snapshot.docs.map(doc => doc.data() as User);
+          useStore.setState({ users });
+          
+          // Update current user profile if it changed
+          const currentProfile = users.find(u => u.id === userId);
+          if (currentProfile) {
+            store.setUserProfile(currentProfile);
+          }
+        }, (error) => handleFirestoreError(error, OperationType.LIST, 'users')),
 
-          onSnapshot(doc(db, 'settings', 'company'), (doc) => {
-            if (doc.exists()) {
-              useStore.setState({ companySettings: doc.data() as CompanySettings });
-            }
-          }, (error) => handleFirestoreError(error, OperationType.GET, 'settings/company')),
-        ];
-      } else {
-        localStorage.removeItem('marketplan_user_id');
-      }
-    } catch (error) {
-      console.error('Error during initStore:', error);
+        onSnapshot(doc(db, 'settings', 'company'), (doc) => {
+          if (doc.exists()) {
+            useStore.setState({ companySettings: doc.data() as CompanySettings });
+          }
+        }, (error) => handleFirestoreError(error, OperationType.GET, 'settings/company')),
+      ];
+    } else {
       localStorage.removeItem('marketplan_user_id');
+      store.setAuthReady(true);
     }
+  } else {
+    store.setAuthReady(true);
   }
   store.setAuthReady(true);
 };

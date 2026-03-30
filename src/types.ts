@@ -4,6 +4,7 @@ export type Product = {
   buyingPrice: number;
   sellingPrice: number;
   websiteLink?: string;
+  videoLinks?: string[];
   createdAt: string;
 };
 
@@ -50,8 +51,8 @@ export type AdItem = {
   platform: AdPlatform;
   status: AdStatus;
   mediaLinks: string[]; // URLs to Drive, FB, etc.
-  startedAt?: string;
-  stoppedAt?: string;
+  startTime?: string;
+  endTime?: string;
   createdAt: string;
 };
 
@@ -63,7 +64,7 @@ export type AdFeedback = {
   createdAt: string;
 };
 
-export type UserRole = 'Admin' | 'Ads Manager' | 'Content Manager';
+export type UserRole = 'Admin' | 'Ads Manager' | 'Content Manager' | 'Custom';
 
 export type UserPermissions = {
   canManageProducts: boolean;
@@ -71,6 +72,7 @@ export type UserPermissions = {
   canManageAds: boolean;
   canManageUsers: boolean;
   canEditSettings: boolean;
+  canSeePrice: boolean;
 };
 
 export type User = {
@@ -80,6 +82,7 @@ export type User = {
   password?: string;
   role: UserRole;
   permissions: UserPermissions;
+  approvedDevices: string[];
   createdAt: string;
 };
 

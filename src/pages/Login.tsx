@@ -14,7 +14,20 @@ export default function Login() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (email && password) {
-      setUser({ id: '1', email, name: email.split('@')[0] });
+      setUser({ 
+        id: '1', 
+        email, 
+        name: email.split('@')[0],
+        role: 'Admin',
+        permissions: {
+          canManageProducts: true,
+          canManageContent: true,
+          canManageAds: true,
+          canManageUsers: true,
+          canEditSettings: true,
+        },
+        createdAt: new Date().toISOString()
+      });
       toast.success('Welcome back to DeMarkt!');
       navigate('/');
     } else {

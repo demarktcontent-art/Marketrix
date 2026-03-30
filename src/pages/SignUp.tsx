@@ -15,7 +15,20 @@ export default function SignUp() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name && email && password) {
-      setUser({ id: '1', email, name });
+      setUser({ 
+        id: '1', 
+        email, 
+        name,
+        role: 'Admin',
+        permissions: {
+          canManageProducts: true,
+          canManageContent: true,
+          canManageAds: true,
+          canManageUsers: true,
+          canEditSettings: true,
+        },
+        createdAt: new Date().toISOString()
+      });
       toast.success('Account created successfully!');
       navigate('/');
     } else {

@@ -6,8 +6,9 @@ import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { Link } from 'react-router-dom';
 import { getEmbedUrl } from '../lib/utils';
-import { ExternalLink, Plus, Trash2, Video, ChevronDown, ChevronUp, MessageSquare, AlertTriangle } from 'lucide-react';
-import { AdPlatform, AdStatus, AdItem } from '../types';
+import { Select } from '../components/ui/Select';
+import { ExternalLink, Plus, Trash2, Video, ChevronDown, ChevronUp, MessageSquare, AlertTriangle, Download } from 'lucide-react';
+import { AdPlatform, AdStatus } from '../types';
 
 export default function AdsPlan() {
   const { products, adItems, addAd, updateAd, addAdFeedback, userProfile } = useStore();
@@ -19,11 +20,11 @@ export default function AdsPlan() {
   // Confirmation Modal State
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ adId: string, linkIndex: number } | null>(null);
-  const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
-  const [selectedProductId, setSelectedProductId] = useState('');
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [selectedProductId, setSelectedProductId] = useState<string>('');
 
   const platforms: AdPlatform[] = ['Facebook', 'TikTok', 'Google'];
-  const statuses: AdStatus[] = ['Planning', 'Ready to Live Ad', 'Live Ad', 'Stopped'];
+  const statuses: AdStatus[] = ['Planning', 'Ready to Live Ad', 'Live Ad'];
 
   const isEditable = userProfile?.permissions?.canManageAds ?? (userProfile?.role === 'Admin' || userProfile?.role === 'Ads Manager');
 
@@ -45,49 +46,15 @@ export default function AdsPlan() {
     if (!isEditable) return;
     
     if (adId) {
-      const ad = adItems.find(a => a.id === adId);
-      if (!ad) return;
-
-      const updates: Partial<AdItem> = { status: newStatus };
-      
-      // Handle start date
-      if (newStatus === 'Live Ad' && ad.status !== 'Live Ad') {
-        updates.startedAt = new Date().toISOString();
-        updates.stoppedAt = undefined; // Clear stop date if re-starting
-      }
-      
-      // Handle stop date
-      if (ad.status === 'Live Ad' && newStatus !== 'Live Ad') {
-        updates.stoppedAt = new Date().toISOString();
-      }
-
-      await updateAd(adId, updates);
+      await updateAd(adId, { status: newStatus });
     } else {
-      const updates: any = {
+      await addAd({
         productId,
         platform: activeTab,
         status: newStatus,
         mediaLinks: []
-      };
-      if (newStatus === 'Live Ad') {
-        updates.startedAt = new Date().toISOString();
-      }
-      await addAd(updates);
+      });
     }
-  };
-
-  const handlePlanNewAd = async () => {
-    if (!selectedProductId || !isEditable) return;
-    
-    await addAd({
-      productId: selectedProductId,
-      platform: activeTab,
-      status: 'Planning',
-      mediaLinks: []
-    });
-    
-    setIsPlanModalOpen(false);
-    setSelectedProductId('');
   };
 
   const handleAddMediaLink = async (adId: string | undefined, productId: string) => {
@@ -111,6 +78,33 @@ export default function AdsPlan() {
     }
     
     setNewLinkInputs({ ...newLinkInputs, [productId]: '' });
+  };
+
+  const handleImportFromProduct = async (adId: string | undefined, productId: string) => {
+    if (!isEditable) return;
+    
+    const product = products.find(p => p.id === productId);
+    if (!product || !product.videoLinks || product.videoLinks.length === 0) return;
+    
+    if (adId) {
+      const ad = adItems.find(a => a.id === adId);
+      if (ad) {
+        // Only add links that aren't already there
+        const existingLinks = new Set(ad.mediaLinks);
+        const linksToAdd = product.videoLinks.filter(link => !existingLinks.has(link));
+        
+        if (linksToAdd.length > 0) {
+          await updateAd(adId, { mediaLinks: [...ad.mediaLinks, ...linksToAdd] });
+        }
+      }
+    } else {
+      await addAd({
+        productId,
+        platform: activeTab,
+        status: 'Planning',
+        mediaLinks: [...product.videoLinks]
+      });
+    }
   };
 
   const openDeleteModal = (adId: string, linkIndex: number) => {
@@ -147,37 +141,55 @@ export default function AdsPlan() {
     setNewFeedbackInputs({ ...newFeedbackInputs, [productId]: '' });
   };
 
-  const plannedAds = adItems.filter(ad => ad.platform === activeTab);
-  const plannedProductIds = new Set(plannedAds.map(ad => ad.productId));
+  const handleImportProductToPlan = async () => {
+    if (!selectedProductId || !isEditable) return;
+    
+    const product = products.find(p => p.id === selectedProductId);
+    if (!product) return;
 
-  const sortedPlannedProducts = products
-    .filter(p => plannedProductIds.has(p.id))
-    .sort((a, b) => {
-      const adA = getAdForProduct(a.id, activeTab);
-      const adB = getAdForProduct(b.id, activeTab);
-      
-      const statusOrder: Record<string, number> = {
-        'Live Ad': 1,
-        'Ready to Live Ad': 2,
-        'Planning': 3,
-        'Stopped': 4
-      };
-      
-      const statusA = adA?.status || 'Planning';
-      const statusB = adB?.status || 'Planning';
-      
-      return statusOrder[statusA] - statusOrder[statusB];
+    await addAd({
+      productId: selectedProductId,
+      platform: activeTab,
+      status: 'Planning',
+      mediaLinks: product.videoLinks || []
     });
 
-  const availableProducts = products.filter(p => !plannedProductIds.has(p.id));
+    setIsImportModalOpen(false);
+    setSelectedProductId('');
+    setExpandedProducts(new Set([selectedProductId]));
+  };
+
+  const plannedProducts = products.filter(product => 
+    adItems.some(ad => ad.productId === product.id && ad.platform === activeTab)
+  );
+
+  const availableProducts = products.filter(product => 
+    !adItems.some(ad => ad.productId === product.id && ad.platform === activeTab)
+  );
+
+  const sortedProducts = [...plannedProducts].sort((a, b) => {
+    const adA = getAdForProduct(a.id, activeTab);
+    const adB = getAdForProduct(b.id, activeTab);
+    
+    const statusOrder: Record<string, number> = {
+      'Live Ad': 1,
+      'Ready to Live Ad': 2,
+      'Planning': 3
+    };
+    
+    const statusA = adA?.status || 'Planning';
+    const statusB = adB?.status || 'Planning';
+    
+    return statusOrder[statusA] - statusOrder[statusB];
+  });
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-900">Ads Plan</h2>
         {isEditable && (
-          <Button onClick={() => setIsPlanModalOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" /> Plan New Ad
+          <Button onClick={() => setIsImportModalOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" /> Import Product to Plan
           </Button>
         )}
       </div>
@@ -202,12 +214,19 @@ export default function AdsPlan() {
         </div>
 
         <div className="p-6 space-y-4">
-          {sortedPlannedProducts.length === 0 ? (
+          {sortedProducts.length === 0 ? (
             <div className="text-center py-12 text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-              No ads planned for {activeTab} yet. Click "Plan New Ad" to start.
+              <Video className="h-12 w-12 mx-auto text-gray-400 mb-3" />
+              <p className="font-medium">No products imported to {activeTab} plan yet.</p>
+              <p className="text-sm mt-1 mb-4">Import a product to start planning your ads.</p>
+              {isEditable && (
+                <Button variant="outline" size="sm" onClick={() => setIsImportModalOpen(true)}>
+                  Import Product
+                </Button>
+              )}
             </div>
           ) : (
-            sortedPlannedProducts.map(product => {
+            sortedProducts.map(product => {
               const ad = getAdForProduct(product.id, activeTab);
               const isExpanded = expandedProducts.has(product.id);
               const status = ad?.status || 'Planning';
@@ -225,23 +244,11 @@ export default function AdsPlan() {
                       </div>
                       <div>
                         <h3 className="font-bold text-gray-900">{product.name}</h3>
-                        <div className="flex flex-col text-sm text-gray-500 mt-1">
-                          <div className="flex items-center">
-                            <span className="mr-3">{videoCount} {videoCount === 1 ? 'Video' : 'Videos'}</span>
-                            <Link to={`/products/${product.id}`} className="text-blue-600 hover:underline flex items-center" onClick={(e) => e.stopPropagation()}>
-                              View Product <ExternalLink className="h-3 w-3 ml-1" />
-                            </Link>
-                          </div>
-                          {ad?.startedAt && (
-                            <div className="text-xs text-green-600 mt-1">
-                              Started: {new Date(ad.startedAt).toLocaleDateString()} {new Date(ad.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </div>
-                          )}
-                          {ad?.stoppedAt && (
-                            <div className="text-xs text-red-600">
-                              Stopped: {new Date(ad.stoppedAt).toLocaleDateString()} {new Date(ad.stoppedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </div>
-                          )}
+                        <div className="flex items-center text-sm text-gray-500 mt-1">
+                          <span className="mr-3">{videoCount} {videoCount === 1 ? 'Video' : 'Videos'}</span>
+                          <Link to={`/products/${product.id}`} className="text-blue-600 hover:underline flex items-center" onClick={(e) => e.stopPropagation()}>
+                            View Product <ExternalLink className="h-3 w-3 ml-1" />
+                          </Link>
                         </div>
                       </div>
                     </div>
@@ -264,7 +271,6 @@ export default function AdsPlan() {
                           className={`text-sm font-medium rounded-full px-3 py-1 border-0 ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6 ${
                             status === 'Live Ad' ? 'bg-green-50 text-green-700 ring-green-600/20 focus:ring-green-600' :
                             status === 'Ready to Live Ad' ? 'bg-blue-50 text-blue-700 ring-blue-600/20 focus:ring-blue-600' :
-                            status === 'Stopped' ? 'bg-red-50 text-red-700 ring-red-600/20 focus:ring-red-600' :
                             'bg-yellow-50 text-yellow-800 ring-yellow-600/20 focus:ring-yellow-600'
                           }`}
                         >
@@ -276,7 +282,6 @@ export default function AdsPlan() {
                         <span className={`text-sm font-medium rounded-full px-3 py-1 ring-1 ring-inset ${
                           status === 'Live Ad' ? 'bg-green-50 text-green-700 ring-green-600/20' :
                           status === 'Ready to Live Ad' ? 'bg-blue-50 text-blue-700 ring-blue-600/20' :
-                          status === 'Stopped' ? 'bg-red-50 text-red-700 ring-red-600/20' :
                           'bg-yellow-50 text-yellow-800 ring-yellow-600/20'
                         }`}>
                           {status}
@@ -291,22 +296,40 @@ export default function AdsPlan() {
                   {isExpanded && (
                     <CardContent className="p-4 bg-white">
                       {isEditable && (
-                        <div className="mb-4 flex flex-col sm:flex-row gap-2">
-                          <Input
-                            placeholder="Paste Facebook post link or Google Drive link here..."
-                            value={newLinkInputs[product.id] || ''}
-                            onChange={(e) => setNewLinkInputs({ ...newLinkInputs, [product.id]: e.target.value })}
-                            className="flex-1"
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                handleAddMediaLink(ad?.id, product.id);
-                              }
-                            }}
-                          />
-                          <Button onClick={() => handleAddMediaLink(ad?.id, product.id)} className="w-full sm:w-auto">
-                            <Plus className="h-4 w-4 mr-2" /> Add Video
-                          </Button>
+                        <div className="mb-4 space-y-3">
+                          <div className="flex flex-col sm:flex-row gap-2">
+                            <Input
+                              placeholder="Paste Facebook post link or Google Drive link here..."
+                              value={newLinkInputs[product.id] || ''}
+                              onChange={(e) => setNewLinkInputs({ ...newLinkInputs, [product.id]: e.target.value })}
+                              className="flex-1"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  handleAddMediaLink(ad?.id, product.id);
+                                }
+                              }}
+                            />
+                            <Button onClick={() => handleAddMediaLink(ad?.id, product.id)} className="w-full sm:w-auto">
+                              <Plus className="h-4 w-4 mr-2" /> Add Video
+                            </Button>
+                          </div>
+                          
+                          {product.videoLinks && product.videoLinks.length > 0 && (
+                            <div className="flex items-center justify-between p-2 bg-blue-50 rounded-md border border-blue-100">
+                              <span className="text-xs text-blue-700 font-medium">
+                                {product.videoLinks.length} video {product.videoLinks.length === 1 ? 'link' : 'links'} available in product details
+                              </span>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => handleImportFromProduct(ad?.id, product.id)}
+                                className="h-7 text-xs bg-white border-blue-200 text-blue-600 hover:bg-blue-50"
+                              >
+                                <Download className="h-3 w-3 mr-1" /> Import All
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       )}
 
@@ -411,41 +434,38 @@ export default function AdsPlan() {
           </div>
         </div>
       </Modal>
-
-      {/* Plan New Ad Modal */}
+      {/* Import Product Modal */}
       <Modal
-        isOpen={isPlanModalOpen}
-        onClose={() => setIsPlanModalOpen(false)}
-        title={`Plan New Ad for ${activeTab}`}
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        title="Import Product to Ads Plan"
       >
         <div className="space-y-4">
+          <p className="text-sm text-gray-500">
+            Select a product to start planning ads for it on <strong>{activeTab}</strong>. 
+            All existing video links from the product will be imported automatically.
+          </p>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Select Product</label>
-            <select
+            <Select
               value={selectedProductId}
               onChange={(e) => setSelectedProductId(e.target.value)}
-              className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
             >
-              <option value="">-- Choose a product --</option>
-              {availableProducts.map(p => (
-                <option key={p.id} value={p.id}>{p.name}</option>
+              <option value="">-- Select a Product --</option>
+              {availableProducts.map(product => (
+                <option key={product.id} value={product.id}>{product.name}</option>
               ))}
-            </select>
+            </Select>
           </div>
-          
-          {availableProducts.length === 0 && (
-            <p className="text-sm text-amber-600">No more products available to plan for this platform.</p>
-          )}
-
           <div className="flex justify-end space-x-3 mt-6">
-            <Button variant="outline" onClick={() => setIsPlanModalOpen(false)}>
+            <Button variant="outline" onClick={() => setIsImportModalOpen(false)}>
               Cancel
             </Button>
             <Button 
-              onClick={handlePlanNewAd}
+              onClick={handleImportProductToPlan}
               disabled={!selectedProductId}
             >
-              Add to Plan
+              Import Product
             </Button>
           </div>
         </div>
