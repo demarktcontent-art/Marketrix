@@ -1,279 +1,129 @@
-import React, { useState } from 'react';
-import { useStore } from '../store';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
-import { Modal } from '../components/ui/Modal';
-import { Button } from '../components/ui/Button';
-import { Package, FileText, Megaphone, TrendingUp, CalendarCheck, MessageSquare, Trash2, CheckCircle2, Circle, AlertTriangle, Clock, Calendar } from 'lucide-react';
+import React from 'react';
+import { motion } from 'motion/react';
+import { 
+  TrendingUp, 
+  ShoppingCart, 
+  Package, 
+  FileText, 
+  ArrowUpRight, 
+  ArrowDownRight,
+  Clock
+} from 'lucide-react';
+import { useStore } from '../store/useStore';
+
+const StatCard = ({ title, value, change, icon: Icon, color }: any) => (
+  <motion.div 
+    whileHover={{ y: -4 }}
+    className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100"
+  >
+    <div className="flex items-center justify-between mb-4">
+      <div className={`p-3 rounded-2xl ${color} bg-opacity-10`}>
+        <Icon className={`w-6 h-6 ${color.replace('bg-', 'text-')}`} />
+      </div>
+      <div className={`flex items-center gap-1 text-sm font-medium ${change > 0 ? 'text-green-600' : 'text-red-600'}`}>
+        {change > 0 ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
+        {Math.abs(change)}%
+      </div>
+    </div>
+    <h3 className="text-gray-500 text-sm font-medium mb-1">{title}</h3>
+    <p className="text-2xl font-bold text-gray-900">{value}</p>
+  </motion.div>
+);
 
 export default function Dashboard() {
-  const { products, contentItems, adItems, pastReports, adFeedbacks, deleteAdFeedback, toggleAdFeedbackDone, userProfile, socialPosts, toggleSocialPostDone } = useStore();
-  
-  // Confirmation Modal State
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [feedbackToDelete, setFeedbackToDelete] = useState<string | null>(null);
+  const { products, contentPlans, adCampaigns } = useStore();
 
-  const isAdsManager = userProfile?.permissions?.canManageAds ?? (userProfile?.role === 'Admin' || userProfile?.role === 'Ads Manager');
-  const canManageContent = userProfile?.permissions?.canManageContent ?? (userProfile?.role === 'Admin' || userProfile?.role === 'Content Manager');
-
-  // Get today's date in YYYY-MM-DD format
-  const today = new Date().toISOString().split('T')[0];
-  const todayPosts = socialPosts.filter(post => post.date === today);
-
-  // Count unique products that have at least one ad in "Live Ad" status
-  const liveAdProductIds = new Set(adItems.filter(ad => ad.status === 'Live Ad').map(ad => ad.productId));
-  const liveAdProductsCount = liveAdProductIds.size;
-
-  // Count unique products that have at least one ad in "Ready to Live Ad" status
-  const readyToLiveAdProductIds = new Set(adItems.filter(ad => ad.status === 'Ready to Live Ad').map(ad => ad.productId));
-  const readyToLiveProductsCount = readyToLiveAdProductIds.size;
-
-  const getProductName = (id: string) => {
-    return products.find(p => p.id === id)?.name || 'Unknown Product';
-  };
-
-  const openDeleteModal = (id: string) => {
-    setFeedbackToDelete(id);
-    setIsDeleteModalOpen(true);
-  };
-
-  const handleConfirmDelete = async () => {
-    if (feedbackToDelete) {
-      await deleteAdFeedback(feedbackToDelete);
-      setIsDeleteModalOpen(false);
-      setFeedbackToDelete(null);
-    }
-  };
+  const stats = [
+    { title: 'Total Products', value: products.length, change: 12, icon: Package, color: 'bg-blue-500' },
+    { title: 'Content Plans', value: contentPlans.length, change: 24, icon: FileText, color: 'bg-orange-500' },
+    { title: 'Active Ads', value: adCampaigns.length, change: -5, icon: TrendingUp, color: 'bg-green-500' },
+    { title: 'New Products', value: products.filter(p => new Date(p.createdAt) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)).length, change: 18, icon: ShoppingCart, color: 'bg-purple-500' },
+  ];
 
   return (
     <div className="space-y-8">
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">Dashboard</h2>
-        
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-gray-500">Total Products</CardTitle>
-              <Package className="h-4 w-4 text-gray-400" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{products.length}</div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-gray-500">Content Ideas</CardTitle>
-              <FileText className="h-4 w-4 text-gray-400" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{contentItems.length}</div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-gray-500">Products in Live Ad</CardTitle>
-              <Megaphone className="h-4 w-4 text-green-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{liveAdProductsCount}</div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-gray-500">Products Ready to Live</CardTitle>
-              <TrendingUp className="h-4 w-4 text-blue-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-600">{readyToLiveProductsCount}</div>
-            </CardContent>
-          </Card>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+          <p className="text-gray-500">Welcome back! Here's what's happening today.</p>
         </div>
+        <button className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-orange-200 transition-all flex items-center gap-2">
+          <Clock className="w-5 h-5" />
+          Schedule Post
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Today's Content Plan Section */}
-        <Card className="flex flex-col h-[500px]">
-          <CardHeader className="border-b border-gray-100 bg-gray-50 flex flex-row items-center justify-between py-4">
-            <CardTitle className="text-lg font-bold text-gray-900 flex items-center">
-              <Calendar className="h-5 w-5 mr-2 text-indigo-600" />
-              Today's Content Plan
-              <span className="ml-2 text-xs font-normal text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">
-                {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-              </span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0 flex-1 flex flex-col overflow-hidden">
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
-              {todayPosts.length > 0 ? (
-                todayPosts.map(post => (
-                  <div key={post.id} className={`bg-white p-4 rounded-lg border shadow-sm relative group transition-all ${post.isDone ? 'border-green-200 bg-green-50/30' : 'border-gray-200'}`}>
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="flex items-center space-x-2">
-                        <button 
-                          onClick={() => canManageContent && toggleSocialPostDone(post.id)}
-                          disabled={!canManageContent}
-                          className={`flex-shrink-0 focus:outline-none ${!canManageContent ? 'cursor-default' : ''} ${post.isDone ? 'text-green-500' : 'text-gray-300 hover:text-gray-400'}`}
-                        >
-                          {post.isDone ? <CheckCircle2 className="h-5 w-5" /> : <Circle className="h-5 w-5" />}
-                        </button>
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
-                          {post.type || 'Post'}
-                        </span>
-                        <span className="text-xs font-semibold text-gray-700">
-                          {post.themeProduct}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="ml-7 space-y-2">
-                      <p className={`text-sm font-medium ${post.isDone ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
-                        {post.visualDescription}
-                      </p>
-                      {post.copyCaption && (
-                        <p className={`text-xs italic ${post.isDone ? 'text-gray-300' : 'text-gray-500'} line-clamp-2`}>
-                          "{post.copyCaption}"
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="h-full flex flex-col items-center justify-center text-gray-500 text-sm italic space-y-2">
-                  <Clock className="h-8 w-8 text-gray-300" />
-                  <p>No posts scheduled for today.</p>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Feedback Section */}
-        <Card className="flex flex-col h-[500px]">
-          <CardHeader className="border-b border-gray-100 bg-gray-50 flex flex-row items-center justify-between py-4">
-            <CardTitle className="text-lg font-bold text-gray-900 flex items-center">
-              <MessageSquare className="h-5 w-5 mr-2 text-blue-600" />
-              Ad Plan Feedback & Notes
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0 flex-1 flex flex-col overflow-hidden">
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
-              {adFeedbacks && adFeedbacks.length > 0 ? (
-                adFeedbacks.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map(feedback => (
-                  <div key={feedback.id} className={`bg-white p-4 rounded-lg border shadow-sm relative group transition-all ${feedback.isDone ? 'border-green-200 bg-green-50/30' : 'border-gray-200'}`}>
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="flex items-center space-x-2">
-                        <button 
-                          onClick={() => isAdsManager && toggleAdFeedbackDone(feedback.id)}
-                          disabled={!isAdsManager}
-                          className={`flex-shrink-0 focus:outline-none ${!isAdsManager ? 'cursor-default' : ''} ${feedback.isDone ? 'text-green-500' : 'text-gray-300 hover:text-gray-400'}`}
-                        >
-                          {feedback.isDone ? <CheckCircle2 className="h-5 w-5" /> : <Circle className="h-5 w-5" />}
-                        </button>
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${feedback.isDone ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`}>
-                          {getProductName(feedback.productId)}
-                        </span>
-                      </div>
-                      <span className="text-xs text-gray-400">
-                        {new Date(feedback.createdAt).toLocaleString()}
-                      </span>
-                    </div>
-                    <p className={`text-sm whitespace-pre-wrap ml-7 ${feedback.isDone ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
-                      {feedback.text}
-                    </p>
-                    {isAdsManager && (
-                      <button
-                        onClick={() => openDeleteModal(feedback.id)}
-                        className="absolute top-2 right-2 p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Delete Feedback"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    )}
-                  </div>
-                ))
-              ) : (
-                <div className="h-full flex items-center justify-center text-gray-500 text-sm italic">
-                  No feedback or notes added yet. Add them from the Ads Plan section.
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Past Reports Section */}
-        {pastReports && pastReports.length > 0 && (
-          <div className="space-y-4">
-            <h3 className="text-xl font-bold text-gray-900">Past Content Reports</h3>
-            <div className="grid grid-cols-1 gap-4 overflow-y-auto max-h-[450px] pr-2">
-              {pastReports.sort((a, b) => new Date(b.archivedAt).getTime() - new Date(a.archivedAt).getTime()).map(report => (
-                <Card key={report.id} className="bg-white">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg font-bold text-gray-900 flex items-center">
-                      <CalendarCheck className="h-5 w-5 mr-2 text-blue-600" />
-                      {report.monthName}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div>
-                        <div className="flex justify-between text-sm mb-1">
-                          <span className="text-gray-500">Completion Rate</span>
-                          <span className="font-medium text-gray-900">{report.completionRate}%</span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div 
-                            className="bg-blue-600 h-2 rounded-full" 
-                            style={{ width: `${report.completionRate}%` }}
-                          ></div>
-                        </div>
-                      </div>
-                      
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Total Posts Planned:</span>
-                        <span className="font-medium text-gray-900">{report.totalPosts}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Successfully Completed:</span>
-                        <span className="font-medium text-green-600">{report.completedPosts}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Missed / Undone:</span>
-                        <span className="font-medium text-red-500">{report.totalPosts - report.completedPosts}</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        )}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {stats.map((stat, i) => (
+          <StatCard key={i} {...stat} />
+        ))}
       </div>
 
-      {/* Delete Confirmation Modal */}
-      <Modal
-        isOpen={isDeleteModalOpen}
-        onClose={() => setIsDeleteModalOpen(false)}
-        title="Delete Feedback"
-      >
-        <div className="space-y-4">
-          <div className="flex items-center space-x-3 text-amber-600">
-            <AlertTriangle className="h-6 w-6" />
-            <p className="font-medium">Are you sure you want to delete this feedback?</p>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between mb-8">
+            <h2 className="text-xl font-bold text-gray-900">Recent Content Plans</h2>
+            <button className="text-orange-600 font-bold text-sm hover:underline">View All</button>
           </div>
-          <p className="text-sm text-gray-500">
-            This action cannot be undone. The feedback will be permanently removed.
-          </p>
-          <div className="flex justify-end space-x-3 mt-6">
-            <Button variant="outline" onClick={() => setIsDeleteModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant="danger" onClick={handleConfirmDelete}>
-              Delete Feedback
-            </Button>
+          
+          <div className="space-y-6">
+            {contentPlans.length > 0 ? (
+              contentPlans.slice(0, 5).map((plan) => (
+                <div key={plan.id} className="flex items-center justify-between p-4 hover:bg-gray-50 rounded-2xl transition-colors">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center">
+                      <FileText className="w-6 h-6 text-gray-400" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-gray-900">{plan.title}</h4>
+                      <p className="text-sm text-gray-500 uppercase tracking-wider font-medium">{plan.platform}</p>
+                    </div>
+                  </div>
+                  <div className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+                    plan.status === 'published' ? 'bg-green-100 text-green-600' :
+                    plan.status === 'scheduled' ? 'bg-blue-100 text-blue-600' :
+                    'bg-gray-100 text-gray-600'
+                  }`}>
+                    {plan.status}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <FileText className="w-8 h-8 text-gray-300" />
+                </div>
+                <p className="text-gray-500">No content plans yet. Start generating!</p>
+              </div>
+            )}
           </div>
         </div>
-      </Modal>
+
+        <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
+          <h2 className="text-xl font-bold text-gray-900 mb-8">Platform Distribution</h2>
+          <div className="space-y-6">
+            {['Shopee', 'Lazada', 'TikTok Shop'].map((platform) => (
+              <div key={platform}>
+                <div className="flex justify-between text-sm font-bold mb-2">
+                  <span className="text-gray-700">{platform}</span>
+                  <span className="text-gray-500">{Math.floor(Math.random() * 100)}%</span>
+                </div>
+                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <motion.div 
+                    initial={{ width: 0 }}
+                    animate={{ width: `${Math.floor(Math.random() * 100)}%` }}
+                    className={`h-full rounded-full ${
+                      platform === 'Shopee' ? 'bg-orange-500' :
+                      platform === 'Lazada' ? 'bg-blue-500' :
+                      'bg-black'
+                    }`}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

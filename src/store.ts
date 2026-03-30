@@ -514,65 +514,67 @@ const initStore = async () => {
   const userId = localStorage.getItem('marketplan_user_id');
   
   if (userId) {
-    const userDoc = await getDoc(doc(db, 'users', userId));
-    if (userDoc.exists()) {
-      const userData = userDoc.data() as User;
-      store.setCurrentUser({ uid: userData.id, email: userData.email });
-      store.setUserProfile(userData);
-      
-      // Set up Firestore listeners
-      const unsubscribes = [
-        onSnapshot(collection(db, 'products'), (snapshot) => {
-          useStore.setState({ products: snapshot.docs.map(doc => doc.data() as Product) });
-        }, (error) => handleFirestoreError(error, OperationType.LIST, 'products')),
+    try {
+      const userDoc = await getDoc(doc(db, 'users', userId));
+      if (userDoc.exists()) {
+        const userData = userDoc.data() as User;
+        store.setCurrentUser({ uid: userData.id, email: userData.email });
+        store.setUserProfile(userData);
+        
+        // Set up Firestore listeners
+        const unsubscribes = [
+          onSnapshot(collection(db, 'products'), (snapshot) => {
+            useStore.setState({ products: snapshot.docs.map(doc => doc.data() as Product) });
+          }, (error) => handleFirestoreError(error, OperationType.LIST, 'products')),
 
-        onSnapshot(collection(db, 'contentItems'), (snapshot) => {
-          useStore.setState({ contentItems: snapshot.docs.map(doc => doc.data() as ContentItem) });
-        }, (error) => handleFirestoreError(error, OperationType.LIST, 'contentItems')),
+          onSnapshot(collection(db, 'contentItems'), (snapshot) => {
+            useStore.setState({ contentItems: snapshot.docs.map(doc => doc.data() as ContentItem) });
+          }, (error) => handleFirestoreError(error, OperationType.LIST, 'contentItems')),
 
-        onSnapshot(collection(db, 'adItems'), (snapshot) => {
-          useStore.setState({ adItems: snapshot.docs.map(doc => doc.data() as AdItem) });
-        }, (error) => handleFirestoreError(error, OperationType.LIST, 'adItems')),
+          onSnapshot(collection(db, 'adItems'), (snapshot) => {
+            useStore.setState({ adItems: snapshot.docs.map(doc => doc.data() as AdItem) });
+          }, (error) => handleFirestoreError(error, OperationType.LIST, 'adItems')),
 
-        onSnapshot(collection(db, 'socialPosts'), (snapshot) => {
-          useStore.setState({ socialPosts: snapshot.docs.map(doc => doc.data() as SocialPost) });
-        }, (error) => handleFirestoreError(error, OperationType.LIST, 'socialPosts')),
+          onSnapshot(collection(db, 'socialPosts'), (snapshot) => {
+            useStore.setState({ socialPosts: snapshot.docs.map(doc => doc.data() as SocialPost) });
+          }, (error) => handleFirestoreError(error, OperationType.LIST, 'socialPosts')),
 
-        onSnapshot(collection(db, 'pastReports'), (snapshot) => {
-          useStore.setState({ pastReports: snapshot.docs.map(doc => doc.data() as ContentReport) });
-        }, (error) => handleFirestoreError(error, OperationType.LIST, 'pastReports')),
+          onSnapshot(collection(db, 'pastReports'), (snapshot) => {
+            useStore.setState({ pastReports: snapshot.docs.map(doc => doc.data() as ContentReport) });
+          }, (error) => handleFirestoreError(error, OperationType.LIST, 'pastReports')),
 
-        onSnapshot(collection(db, 'adFeedbacks'), (snapshot) => {
-          useStore.setState({ adFeedbacks: snapshot.docs.map(doc => doc.data() as AdFeedback) });
-        }, (error) => handleFirestoreError(error, OperationType.LIST, 'adFeedbacks')),
+          onSnapshot(collection(db, 'adFeedbacks'), (snapshot) => {
+            useStore.setState({ adFeedbacks: snapshot.docs.map(doc => doc.data() as AdFeedback) });
+          }, (error) => handleFirestoreError(error, OperationType.LIST, 'adFeedbacks')),
 
-        onSnapshot(collection(db, 'deviceApprovals'), (snapshot) => {
-          useStore.setState({ deviceApprovals: snapshot.docs.map(doc => doc.data() as DeviceApproval) });
-        }, (error) => handleFirestoreError(error, OperationType.LIST, 'deviceApprovals')),
+          onSnapshot(collection(db, 'deviceApprovals'), (snapshot) => {
+            useStore.setState({ deviceApprovals: snapshot.docs.map(doc => doc.data() as DeviceApproval) });
+          }, (error) => handleFirestoreError(error, OperationType.LIST, 'deviceApprovals')),
 
-        onSnapshot(collection(db, 'users'), (snapshot) => {
-          const users = snapshot.docs.map(doc => doc.data() as User);
-          useStore.setState({ users });
-          
-          // Update current user profile if it changed
-          const currentProfile = users.find(u => u.id === userId);
-          if (currentProfile) {
-            store.setUserProfile(currentProfile);
-          }
-        }, (error) => handleFirestoreError(error, OperationType.LIST, 'users')),
+          onSnapshot(collection(db, 'users'), (snapshot) => {
+            const users = snapshot.docs.map(doc => doc.data() as User);
+            useStore.setState({ users });
+            
+            // Update current user profile if it changed
+            const currentProfile = users.find(u => u.id === userId);
+            if (currentProfile) {
+              store.setUserProfile(currentProfile);
+            }
+          }, (error) => handleFirestoreError(error, OperationType.LIST, 'users')),
 
-        onSnapshot(doc(db, 'settings', 'company'), (doc) => {
-          if (doc.exists()) {
-            useStore.setState({ companySettings: doc.data() as CompanySettings });
-          }
-        }, (error) => handleFirestoreError(error, OperationType.GET, 'settings/company')),
-      ];
-    } else {
+          onSnapshot(doc(db, 'settings', 'company'), (doc) => {
+            if (doc.exists()) {
+              useStore.setState({ companySettings: doc.data() as CompanySettings });
+            }
+          }, (error) => handleFirestoreError(error, OperationType.GET, 'settings/company')),
+        ];
+      } else {
+        localStorage.removeItem('marketplan_user_id');
+      }
+    } catch (error) {
+      console.error('Error during initStore:', error);
       localStorage.removeItem('marketplan_user_id');
-      store.setAuthReady(true);
     }
-  } else {
-    store.setAuthReady(true);
   }
   store.setAuthReady(true);
 };

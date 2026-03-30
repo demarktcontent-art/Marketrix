@@ -1,99 +1,45 @@
-export type Product = {
+export type Platform = 'shopee' | 'lazada' | 'tiktok' | 'all';
+
+export interface Product {
   id: string;
   name: string;
-  buyingPrice: number;
-  sellingPrice: number;
+  description: string;
+  price: number;
+  category: string;
+  platform: Platform;
+  stock: number;
+  imageUrl?: string;
   websiteLink?: string;
+  videoLink?: string;
   createdAt: string;
-};
+}
 
-export type ContentStatus = 'Idea' | 'In Progress' | 'Review' | 'Published';
-export type ContentType = 'Post' | 'Reel' | 'Story' | 'Blog' | 'Video';
-
-export type ContentItem = {
+export interface ContentPlan {
   id: string;
   productId: string;
+  platform: Platform;
   title: string;
-  type: ContentType;
-  status: ContentStatus;
-  scheduledDate: string;
-  description?: string;
+  body: string;
+  hashtags: string[];
+  status: 'draft' | 'scheduled' | 'published';
+  scheduledDate?: string;
   createdAt: string;
-};
+}
 
-export type SocialPost = {
-  id: string;
-  date: string;
-  type: string;
-  themeProduct: string;
-  visualDescription: string;
-  copyCaption: string;
-  isDone: boolean;
-  createdAt: string;
-};
-
-export type ContentReport = {
-  id: string;
-  monthName: string;
-  totalPosts: number;
-  completedPosts: number;
-  completionRate: number;
-  archivedAt: string;
-};
-
-export type AdStatus = 'Planning' | 'Ready to Live Ad' | 'Live Ad';
-export type AdPlatform = 'Facebook' | 'Google' | 'TikTok';
-
-export type AdItem = {
+export interface AdCampaign {
   id: string;
   productId: string;
-  platform: AdPlatform;
-  status: AdStatus;
-  mediaLinks: string[]; // URLs to Drive, FB, etc.
-  createdAt: string;
-};
-
-export type AdFeedback = {
-  id: string;
-  productId: string;
-  text: string;
-  isDone?: boolean;
-  createdAt: string;
-};
-
-export type UserRole = 'Admin' | 'Ads Manager' | 'Content Manager';
-
-export type UserPermissions = {
-  canManageProducts: boolean;
-  canManageContent: boolean;
-  canManageAds: boolean;
-  canManageUsers: boolean;
-  canEditSettings: boolean;
-};
-
-export type User = {
-  id: string;
   name: string;
+  budget: number;
+  startDate: string;
+  endDate: string;
+  status: 'active' | 'paused' | 'completed';
+  platform: Platform;
+  createdAt: string;
+}
+
+export interface User {
+  id: string;
   email: string;
-  password?: string;
-  role: UserRole;
-  permissions: UserPermissions;
-  createdAt: string;
-};
-
-export type DeviceApproval = {
-  id: string;
-  userId: string;
-  userEmail: string;
-  userName: string;
-  deviceId: string;
-  deviceName: string;
-  userAgent: string;
-  isApproved: boolean;
-  createdAt: string;
-};
-
-export type CompanySettings = {
   name: string;
-  logoUrl?: string;
-};
+}

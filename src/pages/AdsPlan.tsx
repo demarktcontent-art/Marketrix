@@ -1,353 +1,478 @@
 import React, { useState } from 'react';
-import { useStore } from '../store';
-import { Card, CardContent } from '../components/ui/Card';
-import { Button } from '../components/ui/Button';
-import { Input } from '../components/ui/Input';
-import { Modal } from '../components/ui/Modal';
-import { Link } from 'react-router-dom';
-import { getEmbedUrl } from '../lib/utils';
-import { ExternalLink, Plus, Trash2, Video, ChevronDown, ChevronUp, MessageSquare, AlertTriangle } from 'lucide-react';
-import { AdPlatform, AdStatus } from '../types';
+import { motion, AnimatePresence } from 'motion/react';
+import { 
+  Plus, 
+  Search, 
+  Filter, 
+  Trash2, 
+  Megaphone,
+  X,
+  TrendingUp,
+  Calendar,
+  DollarSign,
+  Target,
+  BarChart3,
+  Globe,
+  ArrowUpRight,
+  Pause,
+  Play,
+  ExternalLink,
+  Video
+} from 'lucide-react';
+import { v4 as uuidv4 } from 'uuid';
+import { toast } from 'sonner';
+import { useStore } from '../store/useStore';
+import { AdCampaign, Platform } from '../types';
 
-export default function AdsPlan() {
-  const { products, adItems, addAd, updateAd, addAdFeedback, userProfile } = useStore();
-  const [activeTab, setActiveTab] = useState<AdPlatform>('Facebook');
-  const [expandedProducts, setExpandedProducts] = useState<Set<string>>(new Set());
-  const [newLinkInputs, setNewLinkInputs] = useState<Record<string, string>>({});
-  const [newFeedbackInputs, setNewFeedbackInputs] = useState<Record<string, string>>({});
-  
-  // Confirmation Modal State
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<{ adId: string, linkIndex: number } | null>(null);
-
-  const platforms: AdPlatform[] = ['Facebook', 'TikTok', 'Google'];
-  const statuses: AdStatus[] = ['Planning', 'Ready to Live Ad', 'Live Ad'];
-
-  const isEditable = userProfile?.permissions?.canManageAds ?? (userProfile?.role === 'Admin' || userProfile?.role === 'Ads Manager');
-
-  const toggleProduct = (productId: string) => {
-    const newExpanded = new Set(expandedProducts);
-    if (newExpanded.has(productId)) {
-      newExpanded.delete(productId);
-    } else {
-      newExpanded.add(productId);
-    }
-    setExpandedProducts(newExpanded);
-  };
-
-  const getAdForProduct = (productId: string, platform: AdPlatform) => {
-    return adItems.find(ad => ad.productId === productId && ad.platform === platform);
-  };
-
-  const handleStatusChange = async (adId: string | undefined, productId: string, newStatus: AdStatus) => {
-    if (!isEditable) return;
-    
-    if (adId) {
-      await updateAd(adId, { status: newStatus });
-    } else {
-      await addAd({
-        productId,
-        platform: activeTab,
-        status: newStatus,
-        mediaLinks: []
-      });
-    }
-  };
-
-  const handleAddMediaLink = async (adId: string | undefined, productId: string) => {
-    if (!isEditable) return;
-    
-    const link = newLinkInputs[productId];
-    if (!link || !link.trim()) return;
-    
-    if (adId) {
-      const ad = adItems.find(a => a.id === adId);
-      if (ad) {
-        await updateAd(adId, { mediaLinks: [...ad.mediaLinks, link] });
-      }
-    } else {
-      await addAd({
-        productId,
-        platform: activeTab,
-        status: 'Planning',
-        mediaLinks: [link]
-      });
-    }
-    
-    setNewLinkInputs({ ...newLinkInputs, [productId]: '' });
-  };
-
-  const openDeleteModal = (adId: string, linkIndex: number) => {
-    setDeleteTarget({ adId, linkIndex });
-    setIsDeleteModalOpen(true);
-  };
-
-  const handleConfirmDelete = async () => {
-    if (!deleteTarget || !isEditable) return;
-    
-    const { adId, linkIndex } = deleteTarget;
-    const ad = adItems.find(a => a.id === adId);
-    if (ad) {
-      const newLinks = [...ad.mediaLinks];
-      newLinks.splice(linkIndex, 1);
-      await updateAd(adId, { mediaLinks: newLinks });
-    }
-    
-    setIsDeleteModalOpen(false);
-    setDeleteTarget(null);
-  };
-
-  const handleAddFeedback = async (productId: string) => {
-    if (!isEditable) return;
-    
-    const text = newFeedbackInputs[productId];
-    if (!text || !text.trim()) return;
-
-    await addAdFeedback({
-      productId,
-      text
-    });
-
-    setNewFeedbackInputs({ ...newFeedbackInputs, [productId]: '' });
-  };
-
-  const sortedProducts = [...products].sort((a, b) => {
-    const adA = getAdForProduct(a.id, activeTab);
-    const adB = getAdForProduct(b.id, activeTab);
-    
-    const statusOrder: Record<string, number> = {
-      'Live Ad': 1,
-      'Ready to Live Ad': 2,
-      'Planning': 3
-    };
-    
-    const statusA = adA?.status || 'Planning';
-    const statusB = adB?.status || 'Planning';
-    
-    return statusOrder[statusA] - statusOrder[statusB];
-  });
+const VideoPreview = ({ url, onClose }: { url: string; onClose: () => void }) => {
+  const isDrive = url.includes('drive.google.com');
+  const isFB = url.includes('facebook.com');
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-900">Ads Plan</h2>
-      </div>
-
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <div className="border-b border-gray-200">
-          <nav className="flex -mb-px">
-            {platforms.map(platform => (
-              <button
-                key={platform}
-                onClick={() => setActiveTab(platform)}
-                className={`w-1/3 py-4 px-1 text-center border-b-2 font-medium text-sm ${
-                  activeTab === platform
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                {platform}
-              </button>
-            ))}
-          </nav>
-        </div>
-
-        <div className="p-6 space-y-4">
-          {sortedProducts.length === 0 ? (
-            <div className="text-center py-12 text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-              No products found. Add products in the Products section first.
-            </div>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden relative"
+      >
+        <button 
+          onClick={onClose}
+          className="absolute top-4 right-4 p-2 bg-black/10 hover:bg-black/20 rounded-full z-10 transition-colors"
+        >
+          <X className="w-6 h-6 text-white" />
+        </button>
+        
+        <div className="aspect-video bg-black flex items-center justify-center">
+          {isDrive ? (
+            <iframe 
+              src={url.replace('/view', '/preview')} 
+              className="w-full h-full" 
+              allow="autoplay"
+              title="Drive Video"
+            />
+          ) : isFB ? (
+            <iframe 
+              src={`https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(url)}&show_text=0&width=560`} 
+              className="w-full h-full" 
+              allowFullScreen={true}
+              allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+              title="FB Video"
+            />
           ) : (
-            sortedProducts.map(product => {
-              const ad = getAdForProduct(product.id, activeTab);
-              const isExpanded = expandedProducts.has(product.id);
-              const status = ad?.status || 'Planning';
-              const videoCount = ad?.mediaLinks.length || 0;
-
-              return (
-                <Card key={product.id} className="overflow-hidden">
-                  <div 
-                    className="p-4 bg-gray-50 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between cursor-pointer hover:bg-gray-100 transition-colors"
-                    onClick={() => toggleProduct(product.id)}
-                  >
-                    <div className="flex items-center space-x-4 mb-4 sm:mb-0">
-                      <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
-                        <Video className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-gray-900">{product.name}</h3>
-                        <div className="flex items-center text-sm text-gray-500 mt-1">
-                          <span className="mr-3">{videoCount} {videoCount === 1 ? 'Video' : 'Videos'}</span>
-                          <Link to={`/products/${product.id}`} className="text-blue-600 hover:underline flex items-center" onClick={(e) => e.stopPropagation()}>
-                            View Product <ExternalLink className="h-3 w-3 ml-1" />
-                          </Link>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center space-x-4" onClick={(e) => e.stopPropagation()}>
-                      {product.websiteLink && (
-                        <a 
-                          href={product.websiteLink} 
-                          target="_blank" 
-                          rel="noopener noreferrer" 
-                          className="hidden sm:flex items-center text-xs font-medium text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded border border-blue-100"
-                        >
-                          Website <ExternalLink className="h-3 w-3 ml-1" />
-                        </a>
-                      )}
-                      {isEditable ? (
-                        <select
-                          value={status}
-                          onChange={(e) => handleStatusChange(ad?.id, product.id, e.target.value as AdStatus)}
-                          className={`text-sm font-medium rounded-full px-3 py-1 border-0 ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6 ${
-                            status === 'Live Ad' ? 'bg-green-50 text-green-700 ring-green-600/20 focus:ring-green-600' :
-                            status === 'Ready to Live Ad' ? 'bg-blue-50 text-blue-700 ring-blue-600/20 focus:ring-blue-600' :
-                            'bg-yellow-50 text-yellow-800 ring-yellow-600/20 focus:ring-yellow-600'
-                          }`}
-                        >
-                          {statuses.map(s => (
-                            <option key={s} value={s}>{s}</option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span className={`text-sm font-medium rounded-full px-3 py-1 ring-1 ring-inset ${
-                          status === 'Live Ad' ? 'bg-green-50 text-green-700 ring-green-600/20' :
-                          status === 'Ready to Live Ad' ? 'bg-blue-50 text-blue-700 ring-blue-600/20' :
-                          'bg-yellow-50 text-yellow-800 ring-yellow-600/20'
-                        }`}>
-                          {status}
-                        </span>
-                      )}
-                      <button onClick={() => toggleProduct(product.id)} className="text-gray-400 hover:text-gray-600">
-                        {isExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-                      </button>
-                    </div>
-                  </div>
-
-                  {isExpanded && (
-                    <CardContent className="p-4 bg-white">
-                      {isEditable && (
-                        <div className="mb-4 flex flex-col sm:flex-row gap-2">
-                          <Input
-                            placeholder="Paste Facebook post link or Google Drive link here..."
-                            value={newLinkInputs[product.id] || ''}
-                            onChange={(e) => setNewLinkInputs({ ...newLinkInputs, [product.id]: e.target.value })}
-                            className="flex-1"
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                handleAddMediaLink(ad?.id, product.id);
-                              }
-                            }}
-                          />
-                          <Button onClick={() => handleAddMediaLink(ad?.id, product.id)} className="w-full sm:w-auto">
-                            <Plus className="h-4 w-4 mr-2" /> Add Video
-                          </Button>
-                        </div>
-                      )}
-
-                      {videoCount > 0 ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                          {ad?.mediaLinks.map((link, idx) => {
-                            const embedUrl = getEmbedUrl(link);
-                            return (
-                              <div key={idx} className="relative group rounded-lg overflow-hidden border border-gray-200 bg-gray-100 aspect-square flex flex-col">
-                                {embedUrl ? (
-                                  <iframe 
-                                    src={embedUrl} 
-                                    className="absolute inset-0 w-full h-full"
-                                    allowFullScreen
-                                    allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
-                                  />
-                                ) : (
-                                  <div className="p-4 flex flex-col items-center justify-center h-full text-center">
-                                    <Video className="h-8 w-8 text-gray-400 mb-2" />
-                                    <span className="text-xs text-gray-500 mb-2 break-all line-clamp-3">{link}</span>
-                                    <a href={link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center text-xs font-medium">
-                                      Open Link <ExternalLink className="h-3 w-3 ml-1" />
-                                    </a>
-                                  </div>
-                                )}
-                                {isEditable && (
-                                  <button
-                                    onClick={() => openDeleteModal(ad.id, idx)}
-                                    className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
-                                    title="Remove Video"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </button>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="text-center py-8 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg">
-                          No videos added for this product on {activeTab} yet.
-                        </div>
-                      )}
-
-                      <div className="mt-6 pt-6 border-t border-gray-100">
-                        <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
-                          <MessageSquare className="h-4 w-4 mr-2 text-blue-500" />
-                          Add Note / Feedback
-                        </h4>
-                        {isEditable ? (
-                          <div className="flex flex-col sm:flex-row gap-2">
-                            <Input
-                              placeholder="Type a note or feedback for this product..."
-                              value={newFeedbackInputs[product.id] || ''}
-                              onChange={(e) => setNewFeedbackInputs({ ...newFeedbackInputs, [product.id]: e.target.value })}
-                              className="flex-1"
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  e.preventDefault();
-                                  handleAddFeedback(product.id);
-                                }
-                              }}
-                            />
-                            <Button onClick={() => handleAddFeedback(product.id)} variant="outline" className="w-full sm:w-auto">
-                              Add Note
-                            </Button>
-                          </div>
-                        ) : (
-                          <p className="text-sm text-gray-500 italic">Only Admins and Ads Managers can add feedback.</p>
-                        )}
-                      </div>
-                    </CardContent>
-                  )}
-                </Card>
-              );
-            })
+            <div className="text-center p-12">
+              <Video className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+              <p className="text-white text-lg font-bold mb-4">Preview not available for this link type</p>
+              <a 
+                href={url} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 bg-orange-500 text-white px-6 py-3 rounded-xl font-bold"
+              >
+                Open Original Link
+                <ExternalLink className="w-4 h-4" />
+              </a>
+            </div>
           )}
         </div>
+        
+        <div className="p-6 bg-white">
+          <h3 className="font-bold text-gray-900">Video Preview</h3>
+          <p className="text-sm text-gray-500 truncate">{url}</p>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
+const AdModal = ({ isOpen, onClose }: any) => {
+  const { products, addAdCampaign } = useStore();
+  const [formData, setFormData] = useState<Partial<AdCampaign>>({
+    name: '',
+    productId: '',
+    budget: 0,
+    startDate: new Date().toISOString().split('T')[0],
+    endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    platform: 'shopee',
+    status: 'active',
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.productId) return toast.error('Please select a product');
+    
+    addAdCampaign({
+      ...formData as AdCampaign,
+      id: uuidv4(),
+      createdAt: new Date().toISOString(),
+    });
+    
+    toast.success('Ad campaign created successfully');
+    onClose();
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/50 backdrop-blur-sm">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden"
+      >
+        <div className="p-8 border-b border-gray-100 flex items-center justify-between">
+          <h2 className="text-2xl font-bold text-gray-900">New Ad Campaign</h2>
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
+            <X className="w-6 h-6 text-gray-400" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-8 space-y-6">
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">Campaign Name</label>
+              <div className="relative">
+                <Target className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  required
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full pl-11 pr-4 py-3 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-orange-500/20 transition-all outline-none"
+                  placeholder="e.g. Summer Sale 2024"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Target Product</label>
+                <select
+                  required
+                  value={formData.productId}
+                  onChange={(e) => setFormData({ ...formData, productId: e.target.value })}
+                  className="w-full p-4 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-orange-500/20 transition-all outline-none appearance-none"
+                >
+                  <option value="">Select a product...</option>
+                  {products.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Platform</label>
+                <select
+                  required
+                  value={formData.platform}
+                  onChange={(e) => setFormData({ ...formData, platform: e.target.value as Platform })}
+                  className="w-full p-4 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-orange-500/20 transition-all outline-none appearance-none"
+                >
+                  <option value="shopee">Shopee Ads</option>
+                  <option value="lazada">Lazada Solutions</option>
+                  <option value="tiktok">TikTok Ads Manager</option>
+                  <option value="facebook">Facebook Ads</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Daily Budget ($)</label>
+                <div className="relative">
+                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    required
+                    type="number"
+                    value={formData.budget}
+                    onChange={(e) => setFormData({ ...formData, budget: parseFloat(e.target.value) })}
+                    className="w-full pl-11 pr-4 py-3 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-orange-500/20 transition-all outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Duration</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    required
+                    type="date"
+                    value={formData.startDate}
+                    onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                    className="w-full p-3 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-orange-500/20 transition-all outline-none text-sm"
+                  />
+                  <span className="text-gray-400">to</span>
+                  <input
+                    required
+                    type="date"
+                    value={formData.endDate}
+                    onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                    className="w-full p-3 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-orange-500/20 transition-all outline-none text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex gap-4 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-4 text-gray-500 font-bold hover:bg-gray-50 rounded-2xl transition-all"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 rounded-2xl shadow-lg shadow-orange-200 transition-all"
+            >
+              Launch Campaign
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </div>
+  );
+};
+
+export default function AdsPlan() {
+  const { adCampaigns, deleteAdCampaign, products, updateAdCampaign } = useStore();
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  const filteredCampaigns = adCampaigns.filter(c => 
+    c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    c.platform.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const toggleStatus = (campaign: AdCampaign) => {
+    const newStatus = campaign.status === 'active' ? 'paused' : 'active';
+    updateAdCampaign(campaign.id, { status: newStatus });
+    toast.info(`Campaign ${newStatus === 'active' ? 'resumed' : 'paused'}`);
+  };
+
+  return (
+    <div className="space-y-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Ads Plan</h1>
+          <p className="text-gray-500">Track and optimize your advertising spend.</p>
+        </div>
+        <button 
+          onClick={() => setIsModalOpen(true)}
+          className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-orange-200 transition-all flex items-center justify-center gap-2"
+        >
+          <Plus className="w-5 h-5" />
+          New Campaign
+        </button>
       </div>
 
-      {/* Delete Confirmation Modal */}
-      <Modal
-        isOpen={isDeleteModalOpen}
-        onClose={() => setIsDeleteModalOpen(false)}
-        title="Remove Video"
-      >
-        <div className="space-y-4">
-          <div className="flex items-center space-x-3 text-amber-600">
-            <AlertTriangle className="h-6 w-6" />
-            <p className="font-medium">Are you sure you want to remove this video link?</p>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
+          <div className="flex items-center gap-4 mb-4">
+            <div className="p-3 bg-blue-50 rounded-2xl">
+              <DollarSign className="w-6 h-6 text-blue-600" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500 font-medium">Total Spend</p>
+              <p className="text-2xl font-bold text-gray-900">$4,250.00</p>
+            </div>
           </div>
-          <p className="text-sm text-gray-500">
-            This action cannot be undone. The video link will be permanently removed from this ad plan.
-          </p>
-          <div className="flex justify-end space-x-3 mt-6">
-            <Button variant="outline" onClick={() => setIsDeleteModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant="danger" onClick={handleConfirmDelete}>
-              Remove Video
-            </Button>
+          <div className="flex items-center gap-1 text-xs text-green-600 font-bold">
+            <ArrowUpRight className="w-3 h-3" />
+            +12.5% from last month
           </div>
         </div>
-      </Modal>
+        
+        <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
+          <div className="flex items-center gap-4 mb-4">
+            <div className="p-3 bg-orange-50 rounded-2xl">
+              <BarChart3 className="w-6 h-6 text-orange-600" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500 font-medium">Avg. ROAS</p>
+              <p className="text-2xl font-bold text-gray-900">4.2x</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1 text-xs text-green-600 font-bold">
+            <ArrowUpRight className="w-3 h-3" />
+            +0.4x from last month
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
+          <div className="flex items-center gap-4 mb-4">
+            <div className="p-3 bg-green-50 rounded-2xl">
+              <TrendingUp className="w-6 h-6 text-green-600" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500 font-medium">Conversions</p>
+              <p className="text-2xl font-bold text-gray-900">1,240</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1 text-xs text-red-600 font-bold">
+            <ArrowUpRight className="w-3 h-3" />
+            -2.1% from last month
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex-1 relative group">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-orange-500 transition-colors" />
+          <input 
+            type="text" 
+            placeholder="Search campaigns..." 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-11 pr-4 py-3 bg-white border border-gray-100 rounded-2xl shadow-sm focus:ring-2 focus:ring-orange-500/20 transition-all outline-none"
+          />
+        </div>
+        <button className="px-6 py-3 bg-white border border-gray-100 rounded-2xl shadow-sm text-gray-600 font-bold flex items-center justify-center gap-2 hover:bg-gray-50 transition-all">
+          <Filter className="w-5 h-5" />
+          Filters
+        </button>
+      </div>
+
+      <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-gray-50/50">
+                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Campaign</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Platform</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Budget</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Duration</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Status</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              <AnimatePresence mode="popLayout">
+                {filteredCampaigns.map((campaign) => {
+                  const product = products.find(p => p.id === campaign.productId);
+                  return (
+                    <motion.tr 
+                      layout
+                      key={campaign.id}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="hover:bg-gray-50/50 transition-colors group"
+                    >
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center">
+                            <Megaphone className="w-5 h-5 text-gray-400" />
+                          </div>
+                          <div>
+                            <p className="font-bold text-gray-900">{campaign.name}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs text-gray-500">{product?.name || 'Unknown Product'}</p>
+                              {product?.websiteLink && (
+                                <a 
+                                  href={product.websiteLink} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="p-1 hover:bg-blue-50 text-blue-500 rounded-lg transition-colors"
+                                  title="Open Website"
+                                >
+                                  <ExternalLink className="w-3 h-3" />
+                                </a>
+                              )}
+                              {product?.videoLink && (
+                                <button 
+                                  onClick={() => setPreviewUrl(product.videoLink!)}
+                                  className="p-1 hover:bg-orange-50 text-orange-500 rounded-lg transition-colors"
+                                  title="Preview Video"
+                                >
+                                  <Play className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                          campaign.platform === 'shopee' ? 'bg-orange-100 text-orange-600' :
+                          campaign.platform === 'lazada' ? 'bg-blue-100 text-blue-600' :
+                          campaign.platform === 'tiktok' ? 'bg-pink-100 text-pink-600' :
+                          'bg-gray-100 text-gray-900'
+                        }`}>
+                          {campaign.platform}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="font-bold text-gray-900">${campaign.budget}</p>
+                        <p className="text-xs text-gray-500">per day</p>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <Calendar className="w-4 h-4 text-gray-400" />
+                          {new Date(campaign.startDate).toLocaleDateString()} - {new Date(campaign.endDate).toLocaleDateString()}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest ${
+                          campaign.status === 'active' ? 'bg-green-100 text-green-600' :
+                          campaign.status === 'paused' ? 'bg-yellow-100 text-yellow-600' :
+                          'bg-gray-100 text-gray-600'
+                        }`}>
+                          <div className={`w-1.5 h-1.5 rounded-full ${
+                            campaign.status === 'active' ? 'bg-green-600' :
+                            campaign.status === 'paused' ? 'bg-yellow-600' :
+                            'bg-gray-600'
+                          }`} />
+                          {campaign.status}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button 
+                            onClick={() => toggleStatus(campaign)}
+                            className="p-2 hover:bg-white rounded-xl text-gray-400 hover:text-orange-600 transition-all shadow-sm border border-transparent hover:border-gray-100"
+                          >
+                            {campaign.status === 'active' ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+                          </button>
+                          <button 
+                            onClick={() => deleteAdCampaign(campaign.id)}
+                            className="p-2 hover:bg-white rounded-xl text-gray-400 hover:text-red-600 transition-all shadow-sm border border-transparent hover:border-gray-100"
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                        </div>
+                      </td>
+                    </motion.tr>
+                  );
+                })}
+              </AnimatePresence>
+            </tbody>
+          </table>
+        </div>
+        
+        {filteredCampaigns.length === 0 && (
+          <div className="text-center py-24">
+            <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Megaphone className="w-10 h-10 text-gray-300" />
+            </div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">No ad campaigns yet</h3>
+            <p className="text-gray-500 mb-8">Plan your first advertising campaign to boost your sales.</p>
+            <button 
+              onClick={() => setIsModalOpen(true)}
+              className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-orange-200 transition-all"
+            >
+              Start Advertising
+            </button>
+          </div>
+        )}
+      </div>
+
+      <AdModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+
+      <AnimatePresence>
+        {previewUrl && (
+          <VideoPreview url={previewUrl} onClose={() => setPreviewUrl(null)} />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

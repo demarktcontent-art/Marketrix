@@ -1,556 +1,407 @@
-import React, { useRef, useState } from 'react';
-import { useStore } from '../store';
-import { Card, CardContent } from '../components/ui/Card';
-import { Button } from '../components/ui/Button';
-import { Modal } from '../components/ui/Modal';
-import { Input } from '../components/ui/Input';
-import { Link } from 'react-router-dom';
-import { Upload, Copy, CheckCircle, Circle, Trash2, Calendar, Archive, CheckSquare, Square, Edit } from 'lucide-react';
-import * as XLSX from 'xlsx';
+import React, { useState, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { 
+  Plus, 
+  Search, 
+  Filter, 
+  Trash2, 
+  FileText,
+  X,
+  Sparkles,
+  Calendar,
+  Globe,
+  CheckCircle2,
+  Clock,
+  Copy,
+  Check,
+  Upload,
+  FileUp
+} from 'lucide-react';
+import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'sonner';
-import { SocialPost } from '../types';
+import Papa from 'papaparse';
+import { useStore } from '../store/useStore';
+import { ContentPlan as ContentPlanType, Platform, Product } from '../types';
+import { generateMarketingContent } from '../services/gemini';
 
-export default function ContentPlan() {
-  const { contentItems, products, socialPosts, addSocialPosts, updateSocialPost, toggleSocialPostDone, deleteSocialPost, archiveAndClearSocialPosts, bulkToggleSocialPostDone, bulkDeleteSocialPost, userProfile } = useStore();
+const ContentModal = ({ isOpen, onClose }: any) => {
+  const { products, addContentPlan } = useStore();
+  const [selectedProductId, setSelectedProductId] = useState('');
+  const [platform, setPlatform] = useState<Platform>('shopee');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedContent, setGeneratedContent] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [activeTab, setActiveTab] = useState<'monthly' | 'ideas'>('monthly');
-  const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [postsToDelete, setPostsToDelete] = useState<string[]>([]);
-  const [archiveMonthName, setArchiveMonthName] = useState('');
-  const [selectedPosts, setSelectedPosts] = useState<Set<string>>(new Set());
-  
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editingPost, setEditingPost] = useState<SocialPost | null>(null);
 
-  const canManageContent = userProfile?.permissions?.canManageContent ?? (userProfile?.role === 'Admin' || userProfile?.role === 'Content Manager');
-
-  const getProductName = (id: string) => {
-    return products.find(p => p.id === id)?.name || 'Unknown Product';
+  const handleGenerate = async () => {
+    const product = products.find(p => p.id === selectedProductId);
+    if (!product) return toast.error('Please select a product');
+    
+    setIsGenerating(true);
+    try {
+      const content = await generateMarketingContent({
+        name: product.name,
+        description: product.description,
+        platform
+      });
+      setGeneratedContent(content);
+      toast.success('AI Content generated successfully!');
+    } catch (error) {
+      toast.error('Failed to generate content. Please try again.');
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
-  const statuses = ['Idea', 'In Progress', 'Review', 'Published'];
+  const handleSave = () => {
+    if (!generatedContent) return;
+    
+    addContentPlan({
+      id: uuidv4(),
+      productId: selectedProductId,
+      platform,
+      title: generatedContent.title,
+      body: generatedContent.body,
+      hashtags: generatedContent.hashtags,
+      status: 'draft',
+      createdAt: new Date().toISOString(),
+    });
+    
+    toast.success('Content plan saved to drafts');
+    onClose();
+    setGeneratedContent(null);
+    setSelectedProductId('');
+  };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCsvUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const isCSV = file.name.toLowerCase().endsWith('.csv');
-    const reader = new FileReader();
-    
-    reader.onload = async (evt) => {
-      try {
-        let wb;
-        if (isCSV) {
-          const text = evt.target?.result as string;
-          wb = XLSX.read(text, { type: 'string' });
-        } else {
-          const arrayBuffer = evt.target?.result as ArrayBuffer;
-          wb = XLSX.read(arrayBuffer, { type: 'array' });
-        }
-        
-        const wsname = wb.SheetNames[0];
-        const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json(ws);
-
-        const newPosts = data.map((row: any) => {
-          const getVal = (keys: string[]) => {
-            const key = Object.keys(row).find(k => keys.some(searchKey => k.toLowerCase().includes(searchKey.toLowerCase())));
-            return key ? String(row[key]) : '';
-          };
-
-          // Handle Excel date serial numbers if necessary
-          let dateVal = getVal(['date', 'তারিখ']);
-          if (typeof row['Date'] === 'number') {
-             // Excel dates are days since Dec 30, 1899
-             const dateObj = new Date(Math.round((row['Date'] - 25569) * 86400 * 1000));
-             dateVal = dateObj.toISOString().split('T')[0];
+    Papa.parse(file, {
+      header: true,
+      complete: (results) => {
+        const plans = results.data as any[];
+        let count = 0;
+        plans.forEach(plan => {
+          if (plan.title && plan.body) {
+            addContentPlan({
+              id: uuidv4(),
+              productId: plan.productId || '',
+              platform: (plan.platform?.toLowerCase() as Platform) || 'all',
+              title: plan.title,
+              body: plan.body,
+              hashtags: plan.hashtags ? plan.hashtags.split(',').map((s: string) => s.trim()) : [],
+              status: 'draft',
+              createdAt: new Date().toISOString(),
+            });
+            count++;
           }
-
-          return {
-            date: dateVal,
-            type: getVal(['type', 'format']),
-            themeProduct: getVal(['theme', 'product', 'বিষয়']),
-            visualDescription: getVal(['visual', 'description', 'ভিজ্যুয়াল']),
-            copyCaption: getVal(['copy', 'caption', 'ক্যাপশন']),
-          };
-        }).filter(post => post.date || post.themeProduct || post.copyCaption);
-
-        if (newPosts.length > 0) {
-          await addSocialPosts(newPosts);
-          toast.success(`Imported ${newPosts.length} posts successfully!`);
-        } else {
-          toast.error("No valid data found. Please check your column headers.");
-        }
-      } catch (error) {
-        toast.error("Error reading file. Please ensure it's a valid Excel or CSV file.");
+        });
+        toast.success(`Imported ${count} content plans from CSV`);
+        onClose();
+      },
+      error: (error) => {
+        toast.error('Failed to parse CSV file');
+        console.error(error);
       }
-    };
-
-    if (isCSV) {
-      reader.readAsText(file, 'UTF-8');
-    } else {
-      reader.readAsArrayBuffer(file);
-    }
-    
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    });
   };
 
-  const copyToClipboard = (text: string) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/50 backdrop-blur-sm">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="bg-white w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+      >
+        <div className="p-8 border-b border-gray-100 flex items-center justify-between shrink-0">
+          <h2 className="text-2xl font-bold text-gray-900">Add Content Plan</h2>
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
+            <X className="w-6 h-6 text-gray-400" />
+          </button>
+        </div>
+
+        <div className="p-8 overflow-y-auto space-y-8">
+          <div className="flex gap-4">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex-1 flex flex-col items-center justify-center p-8 bg-blue-50 border-2 border-dashed border-blue-200 rounded-3xl hover:bg-blue-100 transition-all group"
+            >
+              <FileUp className="w-10 h-10 text-blue-500 mb-2 group-hover:scale-110 transition-transform" />
+              <span className="font-bold text-blue-900">Import CSV</span>
+              <span className="text-xs text-blue-700 mt-1 text-center">Organize content from your spreadsheet</span>
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                className="hidden" 
+                accept=".csv" 
+                onChange={handleCsvUpload}
+              />
+            </button>
+            
+            <div className="flex-1 flex flex-col items-center justify-center p-8 bg-orange-50 border-2 border-dashed border-orange-200 rounded-3xl">
+              <Sparkles className="w-10 h-10 text-orange-500 mb-2" />
+              <span className="font-bold text-orange-900">AI Generator</span>
+              <span className="text-xs text-orange-700 mt-1 text-center">Let Gemini create content for you</span>
+            </div>
+          </div>
+
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-100"></div>
+            </div>
+            <div className="relative flex justify-center text-xs uppercase tracking-widest font-bold text-gray-400">
+              <span className="bg-white px-4">Or Manual / AI Generation</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">Select Product</label>
+              <select
+                value={selectedProductId}
+                onChange={(e) => setSelectedProductId(e.target.value)}
+                className="w-full p-4 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-orange-500/20 transition-all outline-none appearance-none"
+              >
+                <option value="">Choose a product...</option>
+                {products.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">Target Platform</label>
+              <select
+                value={platform}
+                onChange={(e) => setPlatform(e.target.value as Platform)}
+                className="w-full p-4 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-orange-500/20 transition-all outline-none appearance-none"
+              >
+                <option value="shopee">Shopee</option>
+                <option value="lazada">Lazada</option>
+                <option value="tiktok">TikTok Shop</option>
+              </select>
+            </div>
+          </div>
+
+          {!generatedContent ? (
+            <div className="text-center py-12 bg-orange-50 rounded-3xl border border-dashed border-orange-200">
+              <Sparkles className="w-12 h-12 text-orange-400 mx-auto mb-4" />
+              <h3 className="text-lg font-bold text-orange-900 mb-2">AI Content Generator</h3>
+              <p className="text-orange-700 text-sm mb-8 px-8">Select a product and platform to generate high-converting marketing copy with Gemini AI.</p>
+              <button
+                onClick={handleGenerate}
+                disabled={!selectedProductId || isGenerating}
+                className="bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 text-white px-8 py-4 rounded-2xl font-bold shadow-lg shadow-orange-200 transition-all flex items-center gap-2 mx-auto"
+              >
+                {isGenerating ? (
+                  <>
+                    <motion.div 
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                    >
+                      <Sparkles className="w-5 h-5" />
+                    </motion.div>
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-5 h-5" />
+                    Generate Content
+                  </>
+                )}
+              </button>
+            </div>
+          ) : (
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-6"
+            >
+              <div className="p-6 bg-gray-50 rounded-3xl border border-gray-100">
+                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Generated Title</h4>
+                <p className="text-xl font-bold text-gray-900 mb-6">{generatedContent.title}</p>
+                
+                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Body Copy</h4>
+                <p className="text-gray-700 leading-relaxed mb-6 whitespace-pre-wrap">{generatedContent.body}</p>
+                
+                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Hashtags</h4>
+                <div className="flex flex-wrap gap-2">
+                  {generatedContent.hashtags.map((tag: string, i: number) => (
+                    <span key={i} className="px-3 py-1 bg-white border border-gray-100 rounded-lg text-sm text-orange-600 font-medium">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setGeneratedContent(null)}
+                  className="flex-1 py-4 text-gray-500 font-bold hover:bg-gray-50 rounded-2xl transition-all"
+                >
+                  Try Again
+                </button>
+                <button
+                  onClick={handleSave}
+                  className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 rounded-2xl shadow-lg shadow-orange-200 transition-all"
+                >
+                  Save to Drafts
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
+export default function ContentPlan() {
+  const { contentPlans, deleteContentPlan, products } = useStore();
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const filteredPlans = contentPlans.filter(p => 
+    p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    p.platform.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const handleCopy = (plan: ContentPlanType) => {
+    const text = `${plan.title}\n\n${plan.body}\n\n${plan.hashtags.join(' ')}`;
     navigator.clipboard.writeText(text);
-    toast.success("Caption copied to clipboard!");
-  };
-
-  const handleArchive = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!archiveMonthName.trim()) {
-      toast.error("Please enter a month name.");
-      return;
-    }
-    try {
-      await archiveAndClearSocialPosts(archiveMonthName);
-      setIsArchiveModalOpen(false);
-      setArchiveMonthName('');
-      toast.success("Plan archived successfully! You can view it on the Dashboard.");
-    } catch (error) {
-      // Error handled by handleFirestoreError
-    }
-  };
-
-  // Sort posts by date
-  const sortedPosts = [...socialPosts].sort((a, b) => {
-    if (!a.date) return 1;
-    if (!b.date) return -1;
-    return new Date(a.date).getTime() - new Date(b.date).getTime();
-  });
-
-  const toggleSelectPost = (id: string) => {
-    const newSelected = new Set(selectedPosts);
-    if (newSelected.has(id)) {
-      newSelected.delete(id);
-    } else {
-      newSelected.add(id);
-    }
-    setSelectedPosts(newSelected);
-  };
-
-  const toggleSelectAll = () => {
-    if (selectedPosts.size === sortedPosts.length) {
-      setSelectedPosts(new Set());
-    } else {
-      setSelectedPosts(new Set(sortedPosts.map(p => p.id)));
-    }
-  };
-
-  const handleBulkMarkDone = async (isDone: boolean) => {
-    try {
-      await bulkToggleSocialPostDone(Array.from(selectedPosts), isDone);
-      setSelectedPosts(new Set());
-      toast.success(`Marked ${selectedPosts.size} posts as ${isDone ? 'done' : 'undone'}`);
-    } catch (error) {
-      // Error handled by handleFirestoreError
-    }
-  };
-
-  const confirmBulkDelete = () => {
-    setPostsToDelete(Array.from(selectedPosts));
-    setIsDeleteModalOpen(true);
-  };
-
-  const confirmDelete = (id: string) => {
-    setPostsToDelete([id]);
-    setIsDeleteModalOpen(true);
-  };
-
-  const handleBulkDelete = async () => {
-    if (postsToDelete.length > 0) {
-      try {
-        await bulkDeleteSocialPost(postsToDelete);
-        setSelectedPosts(new Set());
-        setIsDeleteModalOpen(false);
-        setPostsToDelete([]);
-        toast.success(`Deleted ${postsToDelete.length === 1 ? 'post' : `${postsToDelete.length} posts`}`);
-      } catch (error) {
-        // Error handled by handleFirestoreError
-      }
-    }
-  };
-
-  const handleEditPost = (post: SocialPost) => {
-    setEditingPost(post);
-    setIsEditModalOpen(true);
-  };
-
-  const handleSaveEdit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (editingPost) {
-      try {
-        await updateSocialPost(editingPost.id, editingPost);
-        setIsEditModalOpen(false);
-        setEditingPost(null);
-        toast.success("Post updated successfully!");
-      } catch (error) {
-        // Error handled by handleFirestoreError
-      }
-    }
+    setCopiedId(plan.id);
+    toast.success('Content copied to clipboard');
+    setTimeout(() => setCopiedId(null), 2000);
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-900">Content Plan</h2>
-        <div className="flex space-x-3">
-          {canManageContent && (
-            <>
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileUpload}
-                accept=".xlsx, .xls, .csv"
-                className="hidden"
-              />
-              <Button onClick={() => fileInputRef.current?.click()}>
-                <Upload className="h-4 w-4 mr-2" />
-                Import Excel/CSV
-              </Button>
-            </>
-          )}
+    <div className="space-y-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Content Plan</h1>
+          <p className="text-gray-500">Generate and manage AI-powered marketing content.</p>
         </div>
+        <button 
+          onClick={() => setIsModalOpen(true)}
+          className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-orange-200 transition-all flex items-center justify-center gap-2"
+        >
+          <Sparkles className="w-5 h-5" />
+          Generate Content
+        </button>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <div className="border-b border-gray-200">
-          <nav className="flex -mb-px">
-            <button
-              onClick={() => setActiveTab('monthly')}
-              className={`w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm ${
-                activeTab === 'monthly'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Monthly Calendar ({socialPosts.length})
-            </button>
-            <button
-              onClick={() => setActiveTab('ideas')}
-              className={`w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm ${
-                activeTab === 'ideas'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Product Ideas Board ({contentItems.length})
-            </button>
-          </nav>
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex-1 relative group">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-orange-500 transition-colors" />
+          <input 
+            type="text" 
+            placeholder="Search content plans..." 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-11 pr-4 py-3 bg-white border border-gray-100 rounded-2xl shadow-sm focus:ring-2 focus:ring-orange-500/20 transition-all outline-none"
+          />
         </div>
+        <button className="px-6 py-3 bg-white border border-gray-100 rounded-2xl shadow-sm text-gray-600 font-bold flex items-center justify-center gap-2 hover:bg-gray-50 transition-all">
+          <Filter className="w-5 h-5" />
+          Filters
+        </button>
+      </div>
 
-        <div className="p-6">
-          {activeTab === 'monthly' && (
-            <div className="space-y-6">
-              {sortedPosts.length > 0 ? (
-                <div className="space-y-6">
-                  <div className="space-y-4">
-                    {sortedPosts.map((post) => (
-                      <Card key={post.id} className={`transition-all ${post.isDone ? 'bg-gray-50 opacity-75' : 'bg-white'} ${selectedPosts.has(post.id) ? 'ring-2 ring-blue-500' : ''}`}>
-                        <div className="p-4 flex flex-col md:flex-row gap-4">
-                          {/* Left Column: Meta */}
-                          <div className="md:w-1/4 space-y-2 border-b md:border-b-0 md:border-r border-gray-100 pb-4 md:pb-0 md:pr-4">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center text-sm font-bold text-gray-900">
-                                <button
-                                  onClick={() => toggleSelectPost(post.id)}
-                                  className="mr-2 text-gray-400 hover:text-gray-600"
-                                >
-                                  {selectedPosts.has(post.id) ? (
-                                    <CheckSquare className="h-5 w-5 text-blue-600" />
-                                  ) : (
-                                    <Square className="h-5 w-5" />
-                                  )}
-                                </button>
-                                <Calendar className="h-4 w-4 mr-1.5 text-gray-500" />
-                                {post.date || 'No Date'}
-                              </div>
-                              {canManageContent && (
-                                <button 
-                                  onClick={() => toggleSocialPostDone(post.id)}
-                                  className={`flex items-center justify-center rounded-full p-1 transition-colors ${post.isDone ? 'text-green-600 hover:bg-green-50' : 'text-gray-400 hover:bg-gray-100'}`}
-                                  title={post.isDone ? "Mark as Undone" : "Mark as Done"}
-                                >
-                                  {post.isDone ? <CheckCircle className="h-6 w-6" /> : <Circle className="h-6 w-6" />}
-                                </button>
-                              )}
-                            </div>
-                            
-                            {post.type && (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                {post.type}
-                              </span>
-                            )}
-                            
-                            <div>
-                              <h4 className={`text-sm font-semibold ${post.isDone ? 'line-through text-gray-500' : 'text-gray-900'}`}>
-                                {post.themeProduct}
-                              </h4>
-                            </div>
-                          </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <AnimatePresence mode="popLayout">
+          {filteredPlans.map((plan) => {
+            const product = products.find(p => p.id === plan.productId);
+            return (
+              <motion.div
+                layout
+                key={plan.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden flex flex-col"
+              >
+                <div className="p-6 border-b border-gray-50 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-xl ${
+                      plan.platform === 'shopee' ? 'bg-orange-100 text-orange-600' :
+                      plan.platform === 'lazada' ? 'bg-blue-100 text-blue-600' :
+                      'bg-gray-100 text-gray-900'
+                    }`}>
+                      <Globe className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-gray-900 line-clamp-1">{plan.title}</h3>
+                      <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">
+                        {plan.platform} • {product?.name || 'Unknown Product'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => handleCopy(plan)}
+                      className="p-2 hover:bg-gray-50 rounded-xl text-gray-400 hover:text-orange-600 transition-all"
+                    >
+                      {copiedId === plan.id ? <Check className="w-5 h-5 text-green-500" /> : <Copy className="w-5 h-5" />}
+                    </button>
+                    <button 
+                      onClick={() => deleteContentPlan(plan.id)}
+                      className="p-2 hover:bg-gray-50 rounded-xl text-gray-400 hover:text-red-600 transition-all"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
 
-                          {/* Middle Column: Visual Description */}
-                          <div className="md:w-1/3 space-y-1 border-b md:border-b-0 md:border-r border-gray-100 pb-4 md:pb-0 md:pr-4">
-                            <h5 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Visual Description</h5>
-                            <p className="text-sm text-gray-700 whitespace-pre-wrap">{post.visualDescription}</p>
-                          </div>
-
-                          {/* Right Column: Caption & Actions */}
-                          <div className="md:w-5/12 space-y-2 flex flex-col">
-                            <div className="flex justify-between items-center">
-                              <h5 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Copy Caption</h5>
-                              <div className="flex space-x-2">
-                                <Button variant="ghost" size="sm" onClick={() => copyToClipboard(post.copyCaption)} className="h-8 px-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50">
-                                  <Copy className="h-4 w-4 mr-1.5" /> Copy
-                                </Button>
-                                {canManageContent && (
-                                  <>
-                                    <Button variant="ghost" size="sm" onClick={() => handleEditPost(post)} className="h-8 px-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100">
-                                      <Edit className="h-4 w-4" />
-                                    </Button>
-                                    <Button variant="ghost" size="sm" onClick={() => confirmDelete(post.id)} className="h-8 px-2 text-red-500 hover:text-red-600 hover:bg-red-50">
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                            <div className="bg-gray-50 p-3 rounded-md border border-gray-100 text-sm text-gray-800 whitespace-pre-wrap flex-1">
-                              {post.copyCaption}
-                            </div>
-                          </div>
-                        </div>
-                      </Card>
+                <div className="p-6 flex-1">
+                  <p className="text-gray-600 text-sm leading-relaxed line-clamp-4 mb-6">{plan.body}</p>
+                  <div className="flex flex-wrap gap-2 mb-6">
+                    {plan.hashtags.map((tag, i) => (
+                      <span key={i} className="text-xs text-orange-600 font-bold">#{tag.replace('#', '')}</span>
                     ))}
                   </div>
+                </div>
 
-                  {/* Bulk Actions and Archive at the bottom */}
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gray-50 p-3 rounded-lg border border-gray-200">
-                    <div className="flex items-center space-x-4">
-                      <button
-                        onClick={toggleSelectAll}
-                        className="flex items-center text-sm font-medium text-gray-700 hover:text-gray-900"
-                      >
-                        {selectedPosts.size === sortedPosts.length && sortedPosts.length > 0 ? (
-                          <CheckSquare className="h-5 w-5 mr-2 text-blue-600" />
-                        ) : (
-                          <Square className="h-5 w-5 mr-2 text-gray-400" />
-                        )}
-                        Select All
-                      </button>
-                      {selectedPosts.size > 0 && (
-                        <span className="text-sm text-gray-500">
-                          {selectedPosts.size} selected
-                        </span>
+                <div className="p-6 pt-0 mt-auto">
+                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl">
+                    <div className="flex items-center gap-2">
+                      {plan.status === 'published' ? (
+                        <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      ) : (
+                        <Clock className="w-4 h-4 text-blue-500" />
                       )}
+                      <span className="text-xs font-bold uppercase tracking-widest text-gray-500">{plan.status}</span>
                     </div>
-                    
-                    <div className="flex flex-wrap gap-2">
-                      {selectedPosts.size > 0 && canManageContent && (
-                        <>
-                          <Button variant="outline" size="sm" onClick={() => handleBulkMarkDone(true)}>
-                            <CheckCircle className="h-4 w-4 mr-2" />
-                            Mark Done
-                          </Button>
-                          <Button variant="outline" size="sm" onClick={() => handleBulkMarkDone(false)}>
-                            <Circle className="h-4 w-4 mr-2" />
-                            Mark Undone
-                          </Button>
-                          <Button variant="outline" size="sm" onClick={confirmBulkDelete} className="text-red-600 hover:text-red-700 hover:bg-red-50">
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </Button>
-                        </>
-                      )}
-                      {canManageContent && socialPosts.length > 0 && (
-                        <Button variant="outline" size="sm" onClick={() => setIsArchiveModalOpen(true)}>
-                          <Archive className="h-4 w-4 mr-2" />
-                          Archive & Clear Plan
-                        </Button>
-                      )}
-                    </div>
+                    <button className="text-xs font-bold text-orange-600 hover:underline">
+                      {plan.status === 'published' ? 'View Live' : 'Schedule'}
+                    </button>
                   </div>
                 </div>
-              ) : (
-                <div className="text-center py-16 px-4 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
-                  <Calendar className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No imported posts yet</h3>
-                  <p className="text-gray-500 max-w-md mx-auto mb-6">
-                    Import your monthly content plan from an Excel or CSV file. Ensure your columns have headers like "Date", "Type", "Theme", "Visual Description", and "Caption".
-                  </p>
-                  {canManageContent && (
-                    <Button onClick={() => fileInputRef.current?.click()}>
-                      <Upload className="h-4 w-4 mr-2" />
-                      Import Excel/CSV
-                    </Button>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'ideas' && (
-            <div className="flex space-x-4 overflow-x-auto pb-4">
-              {statuses.map(status => {
-                const items = contentItems.filter(c => c.status === status);
-                return (
-                  <div key={status} className="flex-1 min-w-[300px] bg-gray-100 rounded-lg p-4">
-                    <h3 className="font-semibold text-gray-700 mb-4 flex justify-between items-center">
-                      {status}
-                      <span className="bg-gray-200 text-gray-600 py-0.5 px-2 rounded-full text-xs">{items.length}</span>
-                    </h3>
-                    <div className="space-y-3">
-                      {items.map(item => (
-                        <Card key={item.id} className="bg-white shadow-sm border-gray-200">
-                          <CardContent className="p-4">
-                            <div className="flex justify-between items-start mb-1">
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700">
-                                {item.type}
-                              </span>
-                              <span className="text-xs text-gray-400">
-                                {item.scheduledDate ? new Date(item.scheduledDate).toLocaleDateString() : ''}
-                              </span>
-                            </div>
-                            <h4 className="font-medium text-gray-900 text-sm mb-1">{item.title}</h4>
-                            <Link to={`/products/${item.productId}`} className="text-xs text-blue-600 hover:underline">
-                              {getProductName(item.productId)}
-                            </Link>
-                          </CardContent>
-                        </Card>
-                      ))}
-                      {items.length === 0 && (
-                        <div className="text-center py-4 text-sm text-gray-400 border-2 border-dashed border-gray-200 rounded-lg">
-                          No items
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
       </div>
 
-      <Modal
-        isOpen={isArchiveModalOpen}
-        onClose={() => setIsArchiveModalOpen(false)}
-        title="Archive Current Plan"
-      >
-        <form onSubmit={handleArchive} className="space-y-4">
-          <p className="text-sm text-gray-600">
-            This will save your current progress as a report and clear the board so you can import a new month's plan.
-          </p>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Report Name (e.g., February 2026)</label>
-            <Input
-              required
-              value={archiveMonthName}
-              onChange={(e) => setArchiveMonthName(e.target.value)}
-              placeholder="e.g. February 2026"
-              autoFocus
-            />
+      {filteredPlans.length === 0 && (
+        <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-gray-200">
+          <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Sparkles className="w-10 h-10 text-gray-300" />
           </div>
-          <div className="mt-6 flex justify-end space-x-3">
-            <Button type="button" variant="ghost" onClick={() => setIsArchiveModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" variant="default">
-              Archive & Clear
-            </Button>
-          </div>
-        </form>
-      </Modal>
-
-      <Modal
-        isOpen={isEditModalOpen}
-        onClose={() => {
-          setIsEditModalOpen(false);
-          setEditingPost(null);
-        }}
-        title="Edit Post"
-      >
-        {editingPost && (
-          <form onSubmit={handleSaveEdit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-              <Input
-                type="date"
-                value={editingPost.date}
-                onChange={(e) => setEditingPost({ ...editingPost, date: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-              <Input
-                value={editingPost.type}
-                onChange={(e) => setEditingPost({ ...editingPost, type: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Theme / Product</label>
-              <Input
-                value={editingPost.themeProduct}
-                onChange={(e) => setEditingPost({ ...editingPost, themeProduct: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Visual Description</label>
-              <textarea
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                rows={3}
-                value={editingPost.visualDescription}
-                onChange={(e) => setEditingPost({ ...editingPost, visualDescription: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Caption</label>
-              <textarea
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                rows={5}
-                value={editingPost.copyCaption}
-                onChange={(e) => setEditingPost({ ...editingPost, copyCaption: e.target.value })}
-              />
-            </div>
-            <div className="mt-6 flex justify-end space-x-3">
-              <Button type="button" variant="ghost" onClick={() => {
-                setIsEditModalOpen(false);
-                setEditingPost(null);
-              }}>
-                Cancel
-              </Button>
-              <Button type="submit" variant="default">
-                Save Changes
-              </Button>
-            </div>
-          </form>
-        )}
-      </Modal>
-
-      <Modal
-        isOpen={isDeleteModalOpen}
-        onClose={() => setIsDeleteModalOpen(false)}
-        title="Confirm Deletion"
-      >
-        <div className="space-y-4">
-          <p className="text-gray-600">
-            Are you sure you want to delete {postsToDelete.length === 1 ? 'this post' : `${postsToDelete.length} posts`}? This action cannot be undone.
-          </p>
-          <div className="flex justify-end space-x-3">
-            <Button variant="ghost" onClick={() => setIsDeleteModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant="danger" onClick={handleBulkDelete}>
-              Delete {postsToDelete.length === 1 ? 'Post' : 'Posts'}
-            </Button>
-          </div>
+          <h3 className="text-xl font-bold text-gray-900 mb-2">No content plans yet</h3>
+          <p className="text-gray-500 mb-8">Use our AI to generate high-converting copy for your products.</p>
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-orange-200 transition-all"
+          >
+            Generate Your First Post
+          </button>
         </div>
-      </Modal>
+      )}
+
+      <ContentModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
     </div>
   );
 }
