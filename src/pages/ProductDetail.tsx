@@ -22,11 +22,11 @@ export default function ProductDetail() {
   const productContent = contentItems.filter(c => c.productId === id);
   const productAds = adItems.filter(a => a.productId === id);
 
+  const canManageAds = userProfile?.permissions?.canManageAds ?? (userProfile?.role === 'Admin' || userProfile?.role === 'Ads Manager');
+  const canManageContent = userProfile?.permissions?.canManageContent ?? (userProfile?.role === 'Admin' || userProfile?.role === 'Content Manager');
   const isAdmin = userProfile?.role === 'Admin';
-  const isAdsManager = userProfile?.role === 'Ads Manager';
-  const isContentManager = userProfile?.role === 'Content Manager';
 
-  const canSeeBuyingPrice = isAdmin || isAdsManager;
+  const canSeeBuyingPrice = isAdmin || (userProfile?.role === 'Ads Manager');
 
   const [contentForm, setContentForm] = useState({
     title: '',
@@ -55,7 +55,7 @@ export default function ProductDetail() {
 
   const handleContentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isContentManager) return;
+    if (!canManageContent) return;
     
     await addContent({
       productId: product.id,
@@ -71,7 +71,7 @@ export default function ProductDetail() {
 
   const handleAdSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isAdsManager) return;
+    if (!canManageAds) return;
     
     const existingAd = adItems.find(a => a.productId === product.id && a.platform === adForm.platform);
     
@@ -181,7 +181,7 @@ export default function ProductDetail() {
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <h3 className="text-lg font-medium text-gray-900">Content Ideas & Schedule</h3>
-                {isContentManager && (
+                {canManageContent && (
                   <Button size="sm" onClick={() => setIsContentModalOpen(true)}>
                     <Plus className="h-4 w-4 mr-2" /> Add Content
                   </Button>
@@ -226,7 +226,7 @@ export default function ProductDetail() {
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <h3 className="text-lg font-medium text-gray-900">Ad Campaigns & Media</h3>
-                {isAdsManager && (
+                {canManageAds && (
                   <Button size="sm" onClick={() => setIsAdModalOpen(true)}>
                     <Plus className="h-4 w-4 mr-2" /> Add Ad Campaign
                   </Button>
