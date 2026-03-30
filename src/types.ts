@@ -1,45 +1,101 @@
-export type Platform = 'shopee' | 'lazada' | 'tiktok' | 'all';
-
-export interface Product {
+export type Product = {
   id: string;
   name: string;
-  description: string;
-  price: number;
-  category: string;
-  platform: Platform;
-  stock: number;
-  imageUrl?: string;
+  buyingPrice: number;
+  sellingPrice: number;
   websiteLink?: string;
-  videoLink?: string;
   createdAt: string;
-}
+};
 
-export interface ContentPlan {
+export type ContentStatus = 'Idea' | 'In Progress' | 'Review' | 'Published';
+export type ContentType = 'Post' | 'Reel' | 'Story' | 'Blog' | 'Video';
+
+export type ContentItem = {
   id: string;
   productId: string;
-  platform: Platform;
   title: string;
-  body: string;
-  hashtags: string[];
-  status: 'draft' | 'scheduled' | 'published';
-  scheduledDate?: string;
+  type: ContentType;
+  status: ContentStatus;
+  scheduledDate: string;
+  description?: string;
   createdAt: string;
-}
+};
 
-export interface AdCampaign {
+export type SocialPost = {
+  id: string;
+  date: string;
+  type: string;
+  themeProduct: string;
+  visualDescription: string;
+  copyCaption: string;
+  isDone: boolean;
+  createdAt: string;
+};
+
+export type ContentReport = {
+  id: string;
+  monthName: string;
+  totalPosts: number;
+  completedPosts: number;
+  completionRate: number;
+  archivedAt: string;
+};
+
+export type AdStatus = 'Planning' | 'Ready to Live Ad' | 'Live Ad' | 'Stopped';
+export type AdPlatform = 'Facebook' | 'Google' | 'TikTok';
+
+export type AdItem = {
   id: string;
   productId: string;
-  name: string;
-  budget: number;
-  startDate: string;
-  endDate: string;
-  status: 'active' | 'paused' | 'completed';
-  platform: Platform;
+  platform: AdPlatform;
+  status: AdStatus;
+  mediaLinks: string[]; // URLs to Drive, FB, etc.
+  startedAt?: string;
+  stoppedAt?: string;
   createdAt: string;
-}
+};
 
-export interface User {
+export type AdFeedback = {
   id: string;
-  email: string;
+  productId: string;
+  text: string;
+  isDone?: boolean;
+  createdAt: string;
+};
+
+export type UserRole = 'Admin' | 'Ads Manager' | 'Content Manager';
+
+export type UserPermissions = {
+  canManageProducts: boolean;
+  canManageContent: boolean;
+  canManageAds: boolean;
+  canManageUsers: boolean;
+  canEditSettings: boolean;
+};
+
+export type User = {
+  id: string;
   name: string;
-}
+  email: string;
+  password?: string;
+  role: UserRole;
+  permissions: UserPermissions;
+  createdAt: string;
+};
+
+export type DeviceApproval = {
+  id: string;
+  userId: string;
+  userEmail: string;
+  userName: string;
+  deviceId: string;
+  deviceName: string;
+  userAgent: string;
+  isApproved: boolean;
+  createdAt: string;
+};
+
+export type CompanySettings = {
+  name: string;
+  logoUrl?: string;
+};
